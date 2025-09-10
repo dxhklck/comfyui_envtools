@@ -1,16 +1,40 @@
 import tkinter as tk
 # 导入必要的模块
 import sys
+import os
+import tempfile
+import time
+
+# 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
+try:
+    from packaging.version import parse as parse_version
+except ImportError:
+    # 自定义简单的版本比较函数
+    def parse_version(version):
+        def normalize(v):
+            return [int(x) for x in v.split('.') if x.isdigit()]
+        return normalize(version)
 
 # 判断是否为Windows平台，并且不是在交互式Python环境中运行
 if sys.platform.startswith('win') and not hasattr(sys, 'ps1'):
-    # 尝试重定向标准输出和错误流到None，避免在无控制台模式下出错
+    # 尝试重定向标准输出和错误流到空设备，避免在无控制台模式下出错
     try:
-        sys.stdout = None
-        sys.stderr = None
+        # 打开空设备
+        devnull = open(os.devnull, 'w')
+        sys.stdout = devnull
+        sys.stderr = devnull
     except:
-        pass
+        try:
+            # 如果打开空设备失败，尝试将输出重定向到对象
+            class NullWriter:
+                def write(self, _): pass
+                def flush(self): pass
+            sys.stdout = NullWriter()
+            sys.stderr = NullWriter()
+        except:
+            pass
 
+import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import subprocess
 import re
@@ -44,7 +68,7 @@ class EnvironmentCheckerApp:
         
     def __init__(self, root):
         self.root = root
-        self.root.title("Python环境依赖冲突检查器")
+        self.root.title("Python环境依赖冲突检查器v1.0 练老师")
         self.root.geometry("800x600")
         self.root.minsize(600, 500)
         
@@ -69,12 +93,10 @@ class EnvironmentCheckerApp:
             font=("SimHei", 10)
         )
         
-        # 创建界面
-        self.create_widgets()
-        
         # 检测系统PATH变量中的Python环境
         system_python = self.find_python_in_path()
         
+        # 初始化所有必要的属性
         # 存储requirements.txt路径
         self.requirements_path = ""
         # 存储Python环境路径
@@ -93,6 +115,9 @@ class EnvironmentCheckerApp:
         self.check_results = {}
         # 标记是否有冲突
         self.has_conflicts = True
+        
+        # 创建界面（在所有属性初始化后）
+        self.create_widgets()
         
     def create_widgets(self):
         # 创建主框架
@@ -181,7 +206,8 @@ class EnvironmentCheckerApp:
                 self.parse_requirements_file()
                 self.update_result_text(f"成功解析requirements.txt文件，共找到 {len(self.dependencies)} 个依赖包。\n\n")
             except Exception as e:
-                messagebox.showerror("错误", f"解析文件失败: {str(e)}")
+                # 在主线程中显示错误消息
+                self.root.after(0, lambda error=str(e): messagebox.showerror("错误", f"解析文件失败: {error}"))
             
             # 重置安装按钮状态
             self.install_btn.config(state=tk.DISABLED)
@@ -243,11 +269,13 @@ class EnvironmentCheckerApp:
         """开始检查环境依赖冲突"""
         # 检查是否选择了Python环境
         if not self.python_exe_path:
-            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            # 在主线程中显示警告消息
+            self.root.after(0, lambda: messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境"))
             return
             
         if not self.dependencies:
-            messagebox.showwarning("警告", "请先选择并解析requirements.txt文件")
+            # 在主线程中显示警告消息
+            self.root.after(0, lambda: messagebox.showwarning("警告", "请先选择并解析requirements.txt文件"))
             return
         
         # 显示进度条
@@ -269,8 +297,13 @@ class EnvironmentCheckerApp:
         for i, (package_name, operator, version) in enumerate(self.dependencies):
             # 更新进度条
             progress = (i + 1) / total_packages * 100
-            self.progress_var.set(progress)
-            self.root.update_idletasks()
+            
+            # 在主线程中更新进度条并刷新UI
+            if self.root._windowingsystem is not None and self.root.winfo_exists():
+                self.root.after(0, lambda p=progress: (
+                    self.progress_var.set(p),
+                    self.root.update_idletasks()
+                ))
             
             try:
                 # 特殊处理git+格式的依赖
@@ -320,8 +353,8 @@ class EnvironmentCheckerApp:
                     'message': f"检查包 '{package_name}' 时出错: {str(e)}"
                 }
         
-        # 显示检查结果
-        self.show_check_results()
+        # 在主线程中显示检查结果
+        self.root.after(0, self.show_check_results)
         
         # 根据检查结果更新安装按钮状态
         if not self.has_conflicts and self.dependencies and self.check_results:
@@ -356,9 +389,7 @@ class EnvironmentCheckerApp:
     def check_version_constraint(self, installed_version, operator, required_version):
         """检查版本约束是否满足"""
         try:
-            # 使用pkg_resources比较版本
-            from pkg_resources import parse_version
-            
+            # 使用文件顶部定义的parse_version函数
             installed = parse_version(installed_version)
             required = parse_version(required_version)
             
@@ -380,7 +411,7 @@ class EnvironmentCheckerApp:
                 installed_parts = installed_version.split('.')
                 required_parts = required_version.split('.')
                 if len(installed_parts) >= 2 and len(required_parts) >= 2:
-                    return (installed_parts[0] == required_parts[0] and 
+                    return (installed_parts[0] == required_parts[0] and \
                             int(installed_parts[1]) >= int(required_parts[1]))
                 return False
             return False
@@ -420,8 +451,9 @@ class EnvironmentCheckerApp:
         # 更新冲突状态
         self.has_conflicts = conflicts > 0 or errors > 0
         
-        # 隐藏进度条
-        self.progress_bar.pack_forget()
+        # 在主线程中隐藏进度条
+        if self.root._windowingsystem is not None and self.root.winfo_exists():
+            self.root.after(0, self.progress_bar.pack_forget)
     
     def start_simulation(self):
         """开始模拟安装"""
@@ -446,6 +478,7 @@ class EnvironmentCheckerApp:
             messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
             return
             
+        temp_requirements_path = None
         try:
             # 构建requirements内容，特殊处理git+格式
             requirements_lines = []
@@ -459,8 +492,6 @@ class EnvironmentCheckerApp:
             requirements_content = "\n".join(requirements_lines)
             
             # 创建临时requirements.txt文件
-            import tempfile
-            import time
             temp_dir = tempfile.gettempdir()
             temp_requirements_path = os.path.join(temp_dir, f"requirements_{int(time.time())}.txt")
             
@@ -489,13 +520,27 @@ class EnvironmentCheckerApp:
             
             if process.returncode == 0:
                 self.update_result_text("模拟安装成功！没有检测到依赖冲突。\n")
+                # 在主线程中显示成功消息
+                self.root.after(0, lambda: messagebox.showinfo("成功", "模拟安装成功！没有检测到依赖冲突。"))
             else:
                 self.update_result_text("模拟安装失败！检测到依赖冲突或其他问题。\n")
+                # 在主线程中显示失败消息
+                self.root.after(0, lambda: messagebox.showerror("失败", "模拟安装失败！检测到依赖冲突或其他问题。"))
         except Exception as e:
             self.update_result_text(f"模拟安装时出错: {str(e)}\n")
+            # 在主线程中显示错误消息
+            self.root.after(0, lambda: messagebox.showerror("错误", f"模拟安装过程中出现错误: {str(e)}"))
+        finally:
+            # 删除临时文件
+            if temp_requirements_path and os.path.exists(temp_requirements_path):
+                try:
+                    os.remove(temp_requirements_path)
+                except:
+                    pass
         
-        # 隐藏进度条
-        self.progress_bar.pack_forget()
+        # 在主线程中隐藏进度条
+        if self.root._windowingsystem is not None and self.root.winfo_exists():
+            self.root.after(0, self.progress_bar.pack_forget)
     
     def view_current_env(self):
         """查看当前Python环境已安装的包"""
@@ -536,16 +581,25 @@ class EnvironmentCheckerApp:
                 self.update_result_text(f"{package}\n")
                 # 更新进度条
                 progress = (packages.index(package) + 1) / len(packages) * 100
-                self.progress_var.set(progress)
-                self.root.update_idletasks()
+                
+                # 在主线程中更新进度条并刷新UI
+                if self.root._windowingsystem is not None and self.root.winfo_exists():
+                    self.root.after(0, lambda p=progress: (
+                        self.progress_var.set(p),
+                        self.root.update_idletasks()
+                    ))
             
-            # 询问用户是否保存环境信息到文件
-            self.root.after(100, lambda: self.ask_save_environment(packages))
+            # 在主线程中询问用户是否保存环境信息到文件
+            self.root.after(100, self._ask_save_environment_on_main_thread, packages)
         except Exception as e:
             self.update_result_text(f"获取环境信息时出错: {str(e)}\n")
         
         # 隐藏进度条
         self.progress_bar.pack_forget()
+        
+    def _ask_save_environment_on_main_thread(self, packages):
+        """在主线程中调用ask_save_environment方法"""
+        self.ask_save_environment(packages)
         
     def ask_save_environment(self, packages):
         """询问用户是否保存环境信息到文件"""
@@ -577,9 +631,12 @@ class EnvironmentCheckerApp:
                             f.write(f"{package}\n")
                     
                     self.update_result_text(f"\n环境信息已成功保存到: {file_path}\n")
+                    # 在主线程中显示成功消息
+                    self.root.after(0, lambda: messagebox.showinfo("成功", f"环境信息已保存到: {file_path}"))
                 except Exception as e:
-                    self.update_result_text(f"\n保存环境信息时出错: {str(e)}\n")
-                    messagebox.showerror("错误", f"保存文件失败: {str(e)}")
+                        self.update_result_text(f"\n保存环境信息时出错: {str(e)}\n")
+                        # 在主线程中显示错误消息
+                        self.root.after(0, lambda: messagebox.showerror("错误", f"保存文件失败: {str(e)}"))
     
     def select_python_environment(self):
         """选择Python环境目录"""
@@ -603,7 +660,8 @@ class EnvironmentCheckerApp:
                 self.install_btn.config(state=tk.DISABLED)
                 self.has_conflicts = True
             else:
-                messagebox.showerror("错误", f"选择的文件不是有效的Python可执行文件: {python_exe}")
+                # 在主线程中显示错误消息
+                self.root.after(0, lambda: messagebox.showerror("错误", f"选择的文件不是有效的Python可执行文件: {python_exe}"))
         else:
             # 如果用户取消选择可执行文件，尝试让用户选择环境目录
             env_dir = filedialog.askdirectory(
@@ -642,7 +700,8 @@ class EnvironmentCheckerApp:
                     self.install_btn.config(state=tk.DISABLED)
                     self.has_conflicts = True
                 else:
-                    messagebox.showerror("错误", f"在选择的目录中未找到有效的Python可执行文件: {env_dir}")
+                    # 在主线程中显示错误消息
+                    self.root.after(0, lambda: messagebox.showerror("错误", f"在选择的目录中未找到有效的Python可执行文件: {env_dir}"))
 
     def start_installation(self):
         """开始实际安装依赖包"""
@@ -680,6 +739,7 @@ class EnvironmentCheckerApp:
 
     def perform_installation(self):
         """实际安装依赖包"""
+        temp_requirements_path = None
         try:
             # 构建requirements内容，特殊处理git+格式
             requirements_lines = []
@@ -693,8 +753,6 @@ class EnvironmentCheckerApp:
             requirements_content = "\n".join(requirements_lines)
             
             # 创建临时requirements.txt文件
-            import tempfile
-            import time
             temp_dir = tempfile.gettempdir()
             temp_requirements_path = os.path.join(temp_dir, f"requirements_{int(time.time())}.txt")
             
@@ -723,30 +781,104 @@ class EnvironmentCheckerApp:
             
             if process.returncode == 0:
                 self.update_result_text("安装成功！所有依赖包已成功安装。\n")
-                messagebox.showinfo("成功", "所有依赖包已成功安装！")
+                # 在主线程中显示成功消息
+                self.root.after(0, lambda: messagebox.showinfo("成功", "所有依赖包已成功安装！"))
             else:
                 self.update_result_text("安装失败！请查看输出信息了解详细错误。\n")
-                messagebox.showerror("失败", "安装过程中出现错误，请查看输出信息。")
+                # 在主线程中显示失败消息
+                self.root.after(0, lambda: messagebox.showerror("失败", "安装过程中出现错误，请查看输出信息。"))
         except Exception as e:
             self.update_result_text(f"安装时出错: {str(e)}\n")
-            messagebox.showerror("错误", f"安装过程中出现错误: {str(e)}")
+            # 在主线程中显示错误消息
+            self.root.after(0, lambda: messagebox.showerror("错误", f"安装过程中出现错误: {str(e)}"))
+        finally:
+            # 删除临时文件
+            if temp_requirements_path and os.path.exists(temp_requirements_path):
+                try:
+                    os.remove(temp_requirements_path)
+                except:
+                    pass
         
-        # 隐藏进度条
-        self.progress_bar.pack_forget()
-        
-        # 重新检查环境，更新状态
-        self.start_checking()
+        # 在主线程中隐藏进度条并重新检查环境
+        if self.root._windowingsystem is not None and self.root.winfo_exists():
+            self.root.after(0, lambda: (
+                self.progress_bar.pack_forget(),
+                self.start_checking()
+            ))
 
     def clear_results(self):
         """清空结果文本框"""
         self.result_text.delete(1.0, tk.END)
 
     def update_result_text(self, text):
-        """更新结果文本框"""
-        self.result_text.insert(tk.END, text)
-        self.result_text.see(tk.END)
+        """更新结果文本框，确保在主线程中执行"""
+        def _update_text():
+            self.result_text.insert(tk.END, text)
+            self.result_text.see(tk.END)
+        
+        # 检查是否在主线程中，如果不是则通过after在主线程中执行
+        if self.root._windowingsystem is not None and self.root.winfo_exists():
+            self.root.after(0, _update_text)
+        else:
+            # 如果窗口已关闭，不进行更新
+            pass
 
 if __name__ == "__main__":
+    # 实现单例应用功能
+    import atexit
+    import sys
+    
+    # 根据不同操作系统选择不同的单例实现方式
+    is_single_instance = True
+    lock_file = None
+    lock_file_path = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
+    
+    try:
+        if sys.platform.startswith('win'):
+            # Windows平台实现
+            import msvcrt
+            lock_file = open(lock_file_path, 'w')
+            # 使用非阻塞锁
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            except:
+                is_single_instance = False
+        else:
+            # Unix/Linux/Mac平台实现
+            import fcntl
+            lock_file = open(lock_file_path, 'w')
+            # 使用非阻塞锁
+            try:
+                fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except:
+                is_single_instance = False
+        
+        # 确保程序退出时释放锁文件
+        def release_lock():
+            try:
+                if lock_file:
+                    if sys.platform.startswith('win'):
+                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                    lock_file.close()
+                if os.path.exists(lock_file_path):
+                    os.remove(lock_file_path)
+            except:
+                pass
+        
+        atexit.register(release_lock)
+        
+    except Exception:
+        is_single_instance = False
+    
+    if not is_single_instance:
+        # 程序已在运行，显示错误消息
+        temp_root = tk.Tk()
+        temp_root.withdraw()  # 隐藏主窗口
+        messagebox.showerror("程序已在运行", "Environment Checker 程序已经在运行中，不能同时打开多个实例。")
+        temp_root.destroy()
+        sys.exit(1)
+    
+    # 继续正常的程序启动流程
     root = tk.Tk()
     
     # 设置窗口图标，支持打包成exe后正确加载
