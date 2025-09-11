@@ -1,9 +1,13 @@
-import tkinter as tk
 # 导入必要的模块
 import sys
 import os
 import tempfile
 import time
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+
+# 项目版本信息
+VERSION = "V1.1"
 
 # 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
 try:
@@ -15,8 +19,31 @@ except ImportError:
             return [int(x) for x in v.split('.') if x.isdigit()]
         return normalize(version)
 
+# 国内常用的pip镜像源
+PYPI_MIRRORS = {
+    '官方源': '',
+    '阿里云': 'https://mirrors.aliyun.com/pypi/simple/',
+    '清华大学': 'https://pypi.tuna.tsinghua.edu.cn/simple/',
+    '中国科学技术大学': 'https://pypi.mirrors.ustc.edu.cn/simple/',
+    '豆瓣': 'https://pypi.douban.com/simple/',
+    '华为云': 'https://mirrors.huaweicloud.com/repository/pypi/simple/'
+}
+
 # 判断是否为Windows平台，并且不是在交互式Python环境中运行
 if sys.platform.startswith('win') and not hasattr(sys, 'ps1'):
+    # 隐藏控制台窗口（更可靠的方法，适用于Python脚本和打包后的exe）
+    try:
+        import ctypes
+        # 获取控制台窗口句柄
+        console_handle = ctypes.windll.kernel32.GetConsoleWindow()
+        if console_handle != 0:
+            # 隐藏控制台窗口
+            ctypes.windll.user32.ShowWindow(console_handle, 0)  # SW_HIDE = 0
+            # 设置窗口位置到屏幕外（额外保险）
+            ctypes.windll.user32.SetWindowPos(console_handle, None, -10000, -10000, 0, 0, 0x0001)  # SWP_NOSIZE
+    except Exception as e:
+        pass
+    
     # 尝试重定向标准输出和错误流到空设备，避免在无控制台模式下出错
     try:
         # 打开空设备
@@ -33,9 +60,6 @@ if sys.platform.startswith('win') and not hasattr(sys, 'ps1'):
             sys.stderr = NullWriter()
         except:
             pass
-
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
 import subprocess
 import re
 import os
@@ -68,7 +92,7 @@ class EnvironmentCheckerApp:
         
     def __init__(self, root):
         self.root = root
-        self.root.title("Python环境依赖冲突检查器v1.0 练老师")
+        self.root.title(f"Python环境依赖冲突检查器{VERSION} 练老师 QQ群：723799422")
         self.root.geometry("800x600")
         self.root.minsize(600, 500)
         
@@ -115,6 +139,10 @@ class EnvironmentCheckerApp:
         self.check_results = {}
         # 标记是否有冲突
         self.has_conflicts = True
+        # 存储当前选择的镜像源
+        self.selected_mirror = "官方源"
+        # 进度条变量
+        self.progress_var = tk.DoubleVar()
         
         # 创建界面（在所有属性初始化后）
         self.create_widgets()
@@ -149,6 +177,23 @@ class EnvironmentCheckerApp:
         
         env_btn = ttk.Button(env_frame, text="选择Python环境", command=self.select_python_environment)
         env_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # 镜像源选择区域
+        mirror_frame = ttk.Frame(main_frame, padding="5")
+        mirror_frame.pack(fill=tk.X, pady=5)
+        
+        mirror_label = ttk.Label(mirror_frame, text="选择PyPI镜像源:")
+        mirror_label.pack(side=tk.LEFT, padx=5)
+        
+        # 创建镜像源下拉框
+        self.mirror_var = tk.StringVar(value=self.selected_mirror)
+        self.mirror_combobox = ttk.Combobox(mirror_frame, textvariable=self.mirror_var, values=list(PYPI_MIRRORS.keys()), state="readonly", width=20)
+        self.mirror_combobox.pack(side=tk.LEFT, padx=5)
+        self.mirror_combobox.bind("<<ComboboxSelected>>", self.on_mirror_change)
+        
+        # 添加镜像源测试按钮
+        test_mirror_btn = ttk.Button(mirror_frame, text="测试镜像源", command=self.test_mirror_speed)
+        test_mirror_btn.pack(side=tk.LEFT, padx=5)
         
         # 中间按钮区域
         btn_frame = ttk.Frame(main_frame, padding="5")
@@ -369,12 +414,19 @@ class EnvironmentCheckerApp:
             return None
             
         try:
-            # 使用指定的Python环境的pip show命令获取包信息
+            # 使用指定的Python环境的pip show命令获取包信息，隐藏控制台窗口
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            # Windows平台添加creationflags参数隐藏控制台窗口
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'show', package_name],
-                capture_output=True,
-                text=True,
-                check=False
+                **kwargs
             )
             
             if result.returncode == 0:
@@ -501,13 +553,29 @@ class EnvironmentCheckerApp:
             # 使用pip install --dry-run模拟安装
             self.update_result_text("正在执行 pip install --dry-run 命令...\n\n")
             
-            process = subprocess.Popen(
-                [self.python_exe_path, '-m', 'pip', 'install', '--dry-run', '-r', temp_requirements_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
+            # 构建命令，添加镜像源参数
+            cmd = [self.python_exe_path, '-m', 'pip', 'install', '--dry-run', '-r', temp_requirements_path]
+            
+            # 添加镜像源参数
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                cmd.extend(['--index-url', mirror_url])
+                cmd.append('--trusted-host')
+                cmd.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+                self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
+            
+            # 设置子进程参数
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.STDOUT,
+                'text': True,
+                'bufsize': 1
+            }
+            # Windows平台添加creationflags参数隐藏控制台窗口
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            process = subprocess.Popen(cmd, **kwargs)
             
             # 实时显示输出
             for line in iter(process.stdout.readline, ''):
@@ -562,12 +630,19 @@ class EnvironmentCheckerApp:
     def get_current_environment(self):
         """获取当前Python环境已安装的包"""
         try:
-            # 使用指定的Python环境的pip list命令获取已安装的包
+            # 使用指定的Python环境的pip list命令获取已安装的包，隐藏控制台窗口
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': True
+            }
+            # Windows平台添加creationflags参数隐藏控制台窗口
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'list', '--format=freeze'],
-                capture_output=True,
-                text=True,
-                check=True
+                **kwargs
             )
             
             packages = result.stdout.strip().split('\n')
@@ -762,13 +837,29 @@ class EnvironmentCheckerApp:
             # 使用pip install命令实际安装依赖
             self.update_result_text(f"正在执行 pip install -r {temp_requirements_path} 命令...\n\n")
             
-            process = subprocess.Popen(
-                [self.python_exe_path, '-m', 'pip', 'install', '-r', temp_requirements_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1
-            )
+            # 构建命令，添加镜像源参数
+            cmd = [self.python_exe_path, '-m', 'pip', 'install', '-r', temp_requirements_path]
+            
+            # 添加镜像源参数
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                cmd.extend(['--index-url', mirror_url])
+                cmd.append('--trusted-host')
+                cmd.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+                self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
+            
+            # 设置子进程参数
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.STDOUT,
+                'text': True,
+                'bufsize': 1
+            }
+            # Windows平台添加creationflags参数隐藏控制台窗口
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            process = subprocess.Popen(cmd, **kwargs)
             
             # 实时显示输出
             for line in iter(process.stdout.readline, ''):
@@ -822,6 +913,152 @@ class EnvironmentCheckerApp:
         else:
             # 如果窗口已关闭，不进行更新
             pass
+            
+    def on_mirror_change(self, event=None):
+        """处理镜像源选择变化"""
+        self.selected_mirror = self.mirror_var.get()
+        mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+        self.update_result_text(f"已切换到镜像源: {self.selected_mirror}{' (' + mirror_url + ')' if mirror_url else ''}\n\n")
+        
+    def test_mirror_speed(self):
+        """测试镜像源速度"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text("开始测试镜像源速度...\n\n")
+        
+        # 在新线程中执行测试
+        test_thread = Thread(target=self._perform_mirror_test)
+        test_thread.daemon = True
+        test_thread.start()
+        
+    def _perform_mirror_test(self):
+        """执行镜像源测试并返回测试结果"""
+        results = []
+        total_mirrors = len(PYPI_MIRRORS)
+        
+        for i, (mirror_name, mirror_url) in enumerate(PYPI_MIRRORS.items()):
+            # 更新进度条
+            progress = (i + 1) / total_mirrors * 100
+            if self.root._windowingsystem is not None and self.root.winfo_exists():
+                self.root.after(0, lambda p=progress: (
+                    self.progress_var.set(p),
+                    self.root.update_idletasks()
+                ))
+            
+            self.update_result_text(f"正在测试 {mirror_name}...\n")
+            
+            try:
+                # 首先尝试使用urllib直接测试HTTP连接，这是最基本的连通性测试
+                if mirror_url:
+                    # 对于非官方源，先尝试HTTP连接测试
+                    start_time = time.time()
+                    connected = self._test_url_connectivity(mirror_url)
+                    elapsed_time = time.time() - start_time
+                    
+                    if connected:
+                        results.append((mirror_name, elapsed_time))
+                        self.update_result_text(f"{mirror_name} 连接成功，响应时间: {elapsed_time:.2f}秒\n\n")
+                        continue  # 如果HTTP连接测试成功，就不再执行pip测试
+                    else:
+                        self.update_result_text(f"{mirror_name} HTTP连接测试失败，尝试pip命令测试...\n")
+                
+                # 如果HTTP连接测试失败或没有URL（官方源），则使用pip命令测试
+                start_time = time.time()
+                
+                # 使用简单的pip命令测试
+                cmd = [self.python_exe_path, '-m', 'pip', 'install', '--dry-run', 'pip']
+                
+                # 如果有镜像源URL，添加index-url和trusted-host参数
+                if mirror_url:
+                    cmd.extend(['--index-url', mirror_url])
+                    # 添加trusted-host参数以避免SSL验证问题
+                    host = mirror_url.split('/')[2]  # 获取主机名
+                    cmd.extend(['--trusted-host', host])
+                
+                kwargs = {
+                    'stdout': subprocess.PIPE,
+                    'stderr': subprocess.STDOUT,
+                    'text': True,
+                    'timeout': 15  # 增加超时时间到15秒
+                }
+                
+                if os.name == 'nt':
+                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+                
+                result = subprocess.run(cmd, **kwargs)
+                
+                elapsed_time = time.time() - start_time
+                
+                # 只要命令执行成功（返回码为0），就认为镜像源可用
+                if result.returncode == 0:
+                    results.append((mirror_name, elapsed_time))
+                    self.update_result_text(f"{mirror_name} 测试成功，响应时间: {elapsed_time:.2f}秒\n\n")
+                else:
+                    # 捕获并显示错误输出的前几行，帮助用户了解失败原因
+                    error_output = result.stdout.strip().split('\n')[:3] if result.stdout else []
+                    error_summary = '\n'.join(error_output)
+                    self.update_result_text(f"{mirror_name} 测试失败: 返回代码 {result.returncode}\n")
+                    if error_summary:
+                        self.update_result_text(f"错误摘要: {error_summary}\n")
+                    self.update_result_text("\n")
+            except subprocess.TimeoutExpired:
+                self.update_result_text(f"{mirror_name} 测试超时（>15秒）\n\n")
+            except Exception as e:
+                self.update_result_text(f"{mirror_name} 测试出错: {str(e)}\n\n")
+        
+        # 显示测试结果排序
+        if results:
+            # 按响应时间排序
+            results.sort(key=lambda x: x[1])
+            
+            self.update_result_text("\n" + "="*60 + "\n")
+            self.update_result_text("镜像源速度测试结果（从快到慢）:\n\n")
+            
+            for i, (mirror_name, elapsed_time) in enumerate(results):
+                self.update_result_text(f"{i+1}. {mirror_name}: {elapsed_time:.2f}秒\n")
+                
+            # 自动选择并应用最快的镜像源
+            fastest_mirror = results[0][0]
+            self.update_result_text(f"\n已自动选择最快的镜像源: {fastest_mirror}\n")
+            
+            # 直接设置最快的镜像源，无需用户确认
+            self.root.after(0, lambda: (
+                self.mirror_var.set(fastest_mirror),
+                self.on_mirror_change()
+            ))
+        
+        # 隐藏进度条
+        if self.root._windowingsystem is not None and self.root.winfo_exists():
+            self.root.after(0, self.progress_bar.pack_forget)
+    
+    def _test_url_connectivity(self, url):
+        """使用urllib测试URL的连通性"""
+        try:
+            import urllib.request
+            import ssl
+            
+            # 创建不验证SSL证书的上下文（避免自签名证书问题）
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            
+            # 设置超时时间
+            timeout = 5
+            
+            # 发送HEAD请求测试连通性
+            with urllib.request.urlopen(url, context=context, timeout=timeout) as response:
+                # 检查响应状态码
+                return response.status < 400
+        except Exception:
+            return False
+            
+
 
 if __name__ == "__main__":
     # 实现单例应用功能
