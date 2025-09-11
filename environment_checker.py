@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 # 项目版本信息
-VERSION = "V1.1"
+VERSION = "V1.2"
 
 # 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
 try:
@@ -208,13 +208,17 @@ class EnvironmentCheckerApp:
         view_btn = ttk.Button(btn_frame, text="查看当前环境", command=self.view_current_env)
         view_btn.pack(side=tk.LEFT, padx=5)
         
-        # 实际安装按钮，初始不可用
-        self.install_btn = ttk.Button(btn_frame, text="实际安装", command=self.start_installation, state=tk.DISABLED)
+        # 实际安装按钮，初始启用
+        self.install_btn = ttk.Button(btn_frame, text="实际安装", command=self.start_installation)
         self.install_btn.pack(side=tk.LEFT, padx=5)
         
         # 清空信息按钮
         clear_btn = ttk.Button(btn_frame, text="清空信息", command=self.clear_results)
         clear_btn.pack(side=tk.LEFT, padx=5)
+        
+        # 比较环境文件按钮
+        compare_btn = ttk.Button(btn_frame, text="比较环境文件", command=self.compare_environment_files)
+        compare_btn.pack(side=tk.LEFT, padx=5)
 
         # 底部结果显示区域
         bottom_frame = ttk.Frame(main_frame, padding="5")
@@ -900,6 +904,196 @@ class EnvironmentCheckerApp:
     def clear_results(self):
         """清空结果文本框"""
         self.result_text.delete(1.0, tk.END)
+        
+    def compare_environment_files(self):
+        """比较两个环境文件的差异"""
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text("开始比较环境文件...\n\n")
+        
+        # 在新线程中执行比较，避免界面卡顿
+        compare_thread = Thread(target=self.perform_file_comparison)
+        compare_thread.daemon = True
+        compare_thread.start()
+        
+    def perform_file_comparison(self):
+        """执行文件比较操作"""
+        # 先清空结果
+        self.root.after(0, lambda: self.result_text.delete(1.0, tk.END))
+        
+        # 选择第一个文件（安装前的环境文件）
+        file1_path = None
+        file2_path = None
+        
+        # 使用主线程弹出文件选择对话框
+        self.root.after(0, lambda: self._select_file_for_comparison(1))
+        
+        # 等待文件选择完成
+        while not hasattr(self, 'selected_file1'):
+            time.sleep(0.1)
+            if not self.root.winfo_exists():
+                return
+        
+        file1_path = self.selected_file1
+        delattr(self, 'selected_file1')
+        
+        if not file1_path:
+            self.update_result_text("操作已取消\n")
+            self.root.after(0, self.progress_bar.pack_forget)
+            return
+        
+        # 选择第二个文件（安装后的环境文件）
+        self.root.after(0, lambda: self._select_file_for_comparison(2))
+        
+        # 等待文件选择完成
+        while not hasattr(self, 'selected_file2'):
+            time.sleep(0.1)
+            if not self.root.winfo_exists():
+                return
+        
+        file2_path = self.selected_file2
+        delattr(self, 'selected_file2')
+        
+        if not file2_path:
+            self.update_result_text("操作已取消\n")
+            self.root.after(0, self.progress_bar.pack_forget)
+            return
+        
+        # 更新进度
+        self.root.after(0, lambda: self.progress_var.set(30))
+        
+        try:
+            # 读取两个文件的内容
+            self.update_result_text(f"正在比较文件:\n{file1_path}\n和\n{file2_path}\n\n")
+            
+            # 解析文件内容，提取包信息
+            packages1 = self._parse_environment_file(file1_path)
+            packages2 = self._parse_environment_file(file2_path)
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(60))
+            
+            # 比较两个文件的差异
+            added, removed, changed = self._compare_environment_packages(packages1, packages2)
+            
+            # 显示比较结果
+            self._show_comparison_results(file1_path, file2_path, added, removed, changed)
+            
+        except Exception as e:
+            self.update_result_text(f"比较文件时出错: {str(e)}\n")
+        finally:
+            # 更新进度并隐藏进度条
+            self.root.after(0, lambda: (
+                self.progress_var.set(100),
+                self.progress_bar.pack_forget()
+            ))
+            
+    def _select_file_for_comparison(self, file_number):
+        """在主线程中选择比较文件"""
+        title = f"选择环境文件 {file_number}"
+        file_path = filedialog.askopenfilename(
+            title=title,
+            filetypes=[("文本文件", "*.txt"), ("所有文件", "*")]
+        )
+        
+        if file_number == 1:
+            self.selected_file1 = file_path
+        else:
+            self.selected_file2 = file_path
+            
+    def _parse_environment_file(self, file_path):
+        """解析环境文件，提取包信息"""
+        packages = {}
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            for line in lines:
+                line = line.strip()
+                # 跳过注释和空行
+                if line.startswith('#') or not line:
+                    continue
+                
+                # 解析包名和版本
+                if '==' in line:
+                    parts = line.split('==')
+                    if len(parts) == 2:
+                        package_name = parts[0].strip()
+                        version = parts[1].strip()
+                        packages[package_name] = version
+                elif '>=' in line or '<=' in line or '>' in line or '<' in line or '!=' in line:
+                    # 处理其他版本约束格式，但只提取包名
+                    import re
+                    match = re.match(r'^([a-zA-Z0-9_-]+)', line)
+                    if match:
+                        package_name = match.group(1)
+                        # 对于非==格式的依赖，我们只记录包名和完整的版本约束
+                        packages[package_name] = line
+                else:
+                    # 没有版本约束的情况
+                    packages[line] = ''
+        except Exception as e:
+            self.update_result_text(f"解析文件 {file_path} 时出错: {str(e)}\n")
+        
+        return packages
+        
+    def _compare_environment_packages(self, packages1, packages2):
+        """比较两个环境的包信息，返回差异"""
+        added = []      # 在packages2中但不在packages1中的包
+        removed = []    # 在packages1中但不在packages2中的包
+        changed = []    # 在两个环境中但版本不同的包
+        
+        # 检查哪些包被添加了
+        for package_name, version2 in packages2.items():
+            if package_name not in packages1:
+                added.append((package_name, version2))
+            elif packages1[package_name] != version2:
+                changed.append((package_name, packages1[package_name], version2))
+        
+        # 检查哪些包被移除了
+        for package_name, version1 in packages1.items():
+            if package_name not in packages2:
+                removed.append((package_name, version1))
+        
+        return added, removed, changed
+        
+    def _show_comparison_results(self, file1_path, file2_path, added, removed, changed):
+        """显示比较结果"""
+        self.update_result_text("="*60 + "\n")
+        self.update_result_text(f"环境文件比较结果\n")
+        self.update_result_text(f"文件1: {os.path.basename(file1_path)}\n")
+        self.update_result_text(f"文件2: {os.path.basename(file2_path)}\n")
+        self.update_result_text("="*60 + "\n\n")
+        
+        # 显示添加的包
+        if added:
+            self.update_result_text(f"新添加的包 ({len(added)} 个):\n")
+            for package_name, version in added:
+                self.update_result_text(f"  + {package_name}=={version}\n")
+            self.update_result_text("\n")
+        
+        # 显示移除的包
+        if removed:
+            self.update_result_text(f"移除的包 ({len(removed)} 个):\n")
+            for package_name, version in removed:
+                self.update_result_text(f"  - {package_name}=={version}\n")
+            self.update_result_text("\n")
+        
+        # 显示版本变化的包
+        if changed:
+            self.update_result_text(f"版本变化的包 ({len(changed)} 个):\n")
+            for package_name, old_version, new_version in changed:
+                self.update_result_text(f"  * {package_name}: {old_version} -> {new_version}\n")
+            self.update_result_text("\n")
+        
+        # 如果没有差异
+        if not added and not removed and not changed:
+            self.update_result_text("两个环境文件完全相同，没有差异！\n")
+        
+        self.update_result_text("="*60 + "\n")
+        self.update_result_text(f"比较完成！\n")
 
     def update_result_text(self, text):
         """更新结果文本框，确保在主线程中执行"""
