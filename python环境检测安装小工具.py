@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 # 项目版本信息
-VERSION = "V1.2"
+VERSION = "V1.3"
 
 # 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
 try:
@@ -208,7 +208,7 @@ class EnvironmentCheckerApp:
         view_btn = ttk.Button(btn_frame, text="查看当前环境", command=self.view_current_env)
         view_btn.pack(side=tk.LEFT, padx=5)
         
-        # 实际安装按钮，初始启用
+        # 实际安装按钮
         self.install_btn = ttk.Button(btn_frame, text="实际安装", command=self.start_installation)
         self.install_btn.pack(side=tk.LEFT, padx=5)
         
@@ -259,7 +259,7 @@ class EnvironmentCheckerApp:
                 self.root.after(0, lambda error=str(e): messagebox.showerror("错误", f"解析文件失败: {error}"))
             
             # 重置安装按钮状态
-            self.install_btn.config(state=tk.DISABLED)
+            self.install_btn.config(state=tk.NORMAL)
             self.has_conflicts = True
     
     def parse_requirements_file(self):
@@ -409,7 +409,7 @@ class EnvironmentCheckerApp:
         if not self.has_conflicts and self.dependencies and self.check_results:
             self.install_btn.config(state=tk.NORMAL)
         else:
-            self.install_btn.config(state=tk.DISABLED)
+            self.install_btn.config(state=tk.NORMAL)
     
     def get_installed_version(self, package_name):
         """获取已安装包的版本"""
@@ -560,8 +560,10 @@ class EnvironmentCheckerApp:
             # 构建命令，添加镜像源参数
             cmd = [self.python_exe_path, '-m', 'pip', 'install', '--dry-run', '-r', temp_requirements_path]
             
-            # 添加镜像源参数
-            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            # 处理镜像源参数（如果没有选择或配置，不使用镜像源）
+            mirror_url = ''
+            if hasattr(self, 'selected_mirror') and hasattr(self, 'PYPI_MIRRORS'):
+                mirror_url = self.PYPI_MIRRORS.get(self.selected_mirror, '')
             if mirror_url:
                 cmd.extend(['--index-url', mirror_url])
                 cmd.append('--trusted-host')
@@ -689,8 +691,8 @@ class EnvironmentCheckerApp:
         )
         
         if answer:
-            # 弹出文件保存对话框，使用格式：当前日期+python环境绝对目录（盘符改为X盘格式，\用-代替）
-            current_date = time.strftime('%Y%m%d')
+            # 弹出文件保存对话框，使用格式：当前日期时间+python环境绝对目录（盘符改为X盘格式，\用-代替）
+            current_datetime = time.strftime('%Y%m%d_%H%M%S')
             # 获取Python环境的绝对路径
             env_absolute_path = self.python_env_path if self.python_env_path else "unknown_env"
             
@@ -708,7 +710,7 @@ class EnvironmentCheckerApp:
                 title="保存环境信息",
                 defaultextension=".txt",
                 filetypes=[("文本文件", "*.txt"), ("所有文件", "*")],
-                initialfile=f"{current_date}_{formatted_env_path}_venv_packages.txt"
+                initialfile=f"{current_datetime}_{formatted_env_path}.txt"
             )
             
             if file_path:
@@ -750,7 +752,7 @@ class EnvironmentCheckerApp:
                 
                 # 重置检查结果和安装按钮状态
                 self.check_results = {}
-                self.install_btn.config(state=tk.DISABLED)
+                self.install_btn.config(state=tk.NORMAL)
                 self.has_conflicts = True
             else:
                 # 在主线程中显示错误消息
@@ -790,7 +792,7 @@ class EnvironmentCheckerApp:
                     
                     # 重置检查结果和安装按钮状态
                     self.check_results = {}
-                    self.install_btn.config(state=tk.DISABLED)
+                    self.install_btn.config(state=tk.NORMAL)
                     self.has_conflicts = True
                 else:
                     # 在主线程中显示错误消息
@@ -798,28 +800,11 @@ class EnvironmentCheckerApp:
 
     def start_installation(self):
         """开始实际安装依赖包"""
-        # 检查是否选择了Python环境
-        if not self.python_exe_path:
-            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
-            return
-            
-        if not self.dependencies:
+        # 检查是否选择了requirements.txt文件
+        if not hasattr(self, 'dependencies') or not self.dependencies:
             messagebox.showwarning("警告", "请先选择并解析requirements.txt文件")
             return
-        
-        if self.has_conflicts:
-            messagebox.showwarning("警告", "检测到冲突，无法进行实际安装")
-            return
-        
-        # 确认安装
-        confirm = messagebox.askyesno(
-            "确认安装",
-            f"即将在Python环境 {self.python_exe_path} 中安装 {len(self.dependencies)} 个依赖包，是否继续？"
-        )
-        
-        if not confirm:
-            return
-        
+            
         # 显示进度条
         self.progress_bar.pack(fill=tk.X, pady=5)
         self.progress_var.set(0)
@@ -831,9 +816,15 @@ class EnvironmentCheckerApp:
         install_thread.start()
 
     def perform_installation(self):
-        """实际安装依赖包"""
+        """实际安装依赖包 - 忽略所有环境和依赖检查"""
         temp_requirements_path = None
         try:
+            # 如果没有选择Python环境，使用默认Python
+            if not hasattr(self, 'python_exe_path') or not self.python_exe_path:
+                self.python_exe_path = 'python'
+                self.update_result_text("未选择Python环境，使用默认Python...\n\n")
+            
+
             # 构建requirements内容，特殊处理git+格式
             requirements_lines = []
             for pkg, op, ver in self.dependencies:
@@ -859,7 +850,12 @@ class EnvironmentCheckerApp:
             cmd = [self.python_exe_path, '-m', 'pip', 'install', '-r', temp_requirements_path]
             
             # 添加镜像源参数
-            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            mirror_url = ''
+            if hasattr(self, 'selected_mirror'):
+                try:
+                    mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+                except:
+                    pass
             if mirror_url:
                 cmd.extend(['--index-url', mirror_url])
                 cmd.append('--trusted-host')
