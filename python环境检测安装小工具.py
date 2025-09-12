@@ -689,12 +689,26 @@ class EnvironmentCheckerApp:
         )
         
         if answer:
-            # 弹出文件保存对话框
+            # 弹出文件保存对话框，使用格式：当前日期+python环境绝对目录（盘符改为X盘格式，\用-代替）
+            current_date = time.strftime('%Y%m%d')
+            # 获取Python环境的绝对路径
+            env_absolute_path = self.python_env_path if self.python_env_path else "unknown_env"
+            
+            # 处理路径格式：将盘符从X:改为X盘
+            formatted_path = env_absolute_path
+            if len(env_absolute_path) >= 2 and env_absolute_path[1] == ':':
+                drive_letter = env_absolute_path[0]
+                rest_path = env_absolute_path[2:] if len(env_absolute_path) > 2 else ''
+                formatted_path = f"{drive_letter}盘{rest_path}"
+            
+            # 替换路径中的反斜杠为连字符，并处理其他无效字符
+            formatted_env_path = formatted_path.replace('\\', '-').replace('/', '-').replace(':', '-').replace('*', '-').replace('?', '-').replace('"', '-').replace('<', '-').replace('>', '-').replace('|', '-')
+            
             file_path = filedialog.asksaveasfilename(
                 title="保存环境信息",
                 defaultextension=".txt",
                 filetypes=[("文本文件", "*.txt"), ("所有文件", "*")],
-                initialfile=f"python_env_{os.path.basename(self.python_exe_path)}_packages.txt"
+                initialfile=f"{current_date}_{formatted_env_path}_venv_packages.txt"
             )
             
             if file_path:
