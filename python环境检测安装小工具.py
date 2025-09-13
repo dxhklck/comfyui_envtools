@@ -4,10 +4,10 @@ import os
 import tempfile
 import time
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog
 
 # 项目版本信息
-VERSION = "V1.3"
+VERSION = "V2.0"
 
 # 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
 try:
@@ -92,9 +92,18 @@ class EnvironmentCheckerApp:
         
     def __init__(self, root):
         self.root = root
-        self.root.title(f"Python环境依赖冲突检查器{VERSION} 练老师 QQ群：723799422")
-        self.root.geometry("800x600")
-        self.root.minsize(600, 500)
+        self.root.title(f"ComfyUI中Python环境维护小工具 {VERSION} 练老师 QQ群: 723799422")
+        self.root.geometry("1200x700")
+        self.root.minsize(900, 700)
+        
+        # 设置窗口图标
+        try:
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'favicon.ico')
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except Exception as e:
+            # 如果设置图标失败，静默忽略错误
+            pass
         
         # 设置窗口在桌面中央显示
         self.root.update_idletasks()  # 更新窗口大小信息
@@ -106,15 +115,15 @@ class EnvironmentCheckerApp:
         y = (screen_height - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         
-        # 设置中文字体支持
+        # 设置中文字体支持 - 优化字体大小
         self.style = ttk.Style()
         self.style.configure(
             "TButton",
-            font=("SimHei", 10)
+            font=("SimHei", 11)
         )
         self.style.configure(
             "TLabel",
-            font=("SimHei", 10)
+            font=("SimHei", 11)
         )
         
         # 检测系统PATH变量中的Python环境
@@ -137,6 +146,8 @@ class EnvironmentCheckerApp:
         self.dependencies = []
         # 存储检查结果
         self.check_results = {}
+        # 存储历史使用过的库名称
+        self.lib_history = []
         # 标记是否有冲突
         self.has_conflicts = True
         # 存储当前选择的镜像源
@@ -152,87 +163,205 @@ class EnvironmentCheckerApp:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 顶部选择文件区域
-        top_frame = ttk.Frame(main_frame, padding="5")
-        top_frame.pack(fill=tk.X, pady=5)
+        # 创建左右分栏的PanedWindow
+        paned_window = ttk.PanedWindow(main_frame, orient=tk.HORIZONTAL)
+        paned_window.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        self.file_label = ttk.Label(top_frame, text="未选择requirements.txt文件")
-        self.file_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        # 创建左侧面板 - 包含配置和操作功能
+        left_frame = ttk.LabelFrame(paned_window, text="配置与操作", padding="10")
+        paned_window.add(left_frame, weight=1)
         
-        select_btn = ttk.Button(top_frame, text="选择文件", command=self.select_requirements_file)
-        select_btn.pack(side=tk.RIGHT, padx=5)
+        # 创建右侧面板 - 包含结果显示
+        right_frame = ttk.LabelFrame(paned_window, text="结果显示", padding="10")
+        paned_window.add(right_frame, weight=2)
         
-        # Python环境选择区域
-        env_frame = ttk.Frame(main_frame, padding="5")
-        env_frame.pack(fill=tk.X, pady=5)
-        
-        # 根据是否在PATH中找到Python环境显示不同的文本
-        if self.python_exe_path:
-            env_text = f"当前Python环境: {self.python_exe_path}"
-        else:
-            env_text = "当前Python环境: 未选择"
-            
-        self.env_label = ttk.Label(env_frame, text=env_text)
-        self.env_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        
-        env_btn = ttk.Button(env_frame, text="选择Python环境", command=self.select_python_environment)
-        env_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # 镜像源选择区域
-        mirror_frame = ttk.Frame(main_frame, padding="5")
+        # === 左侧面板内容 ===
+
+        # 镜像源选择区域 - 移至窗口第一行，调整为与其他子界面一致的grid布局
+        mirror_frame = ttk.LabelFrame(left_frame, text="PyPI镜像源", padding="10")
         mirror_frame.pack(fill=tk.X, pady=5)
         
-        mirror_label = ttk.Label(mirror_frame, text="选择PyPI镜像源:")
-        mirror_label.pack(side=tk.LEFT, padx=5)
+        # 创建标签和下拉框容器
+        mirror_label_container = ttk.Frame(mirror_frame)
+        mirror_label_container.pack(fill=tk.X, pady=2)
+        
+        mirror_label = ttk.Label(mirror_label_container, text="选择PyPI镜像源:", width=15)
+        mirror_label.pack(side=tk.LEFT, padx=(5, 0))
         
         # 创建镜像源下拉框
         self.mirror_var = tk.StringVar(value=self.selected_mirror)
-        self.mirror_combobox = ttk.Combobox(mirror_frame, textvariable=self.mirror_var, values=list(PYPI_MIRRORS.keys()), state="readonly", width=20)
-        self.mirror_combobox.pack(side=tk.LEFT, padx=5)
+        self.mirror_combobox = ttk.Combobox(mirror_label_container, textvariable=self.mirror_var, values=list(PYPI_MIRRORS.keys()), state="readonly", width=20)
+        self.mirror_combobox.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         self.mirror_combobox.bind("<<ComboboxSelected>>", self.on_mirror_change)
         
         # 添加镜像源测试按钮
-        test_mirror_btn = ttk.Button(mirror_frame, text="测试镜像源", command=self.test_mirror_speed)
-        test_mirror_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 中间按钮区域
-        btn_frame = ttk.Frame(main_frame, padding="5")
-        btn_frame.pack(fill=tk.X, pady=5)
-        
-        check_btn = ttk.Button(btn_frame, text="检查环境冲突", command=self.start_checking)
-        check_btn.pack(side=tk.LEFT, padx=5)
-        
-        simulate_btn = ttk.Button(btn_frame, text="模拟安装", command=self.start_simulation)
-        simulate_btn.pack(side=tk.LEFT, padx=5)
-        
-        view_btn = ttk.Button(btn_frame, text="查看当前环境", command=self.view_current_env)
-        view_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 实际安装按钮
-        self.install_btn = ttk.Button(btn_frame, text="实际安装", command=self.start_installation)
-        self.install_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 清空信息按钮
-        clear_btn = ttk.Button(btn_frame, text="清空信息", command=self.clear_results)
-        clear_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 比较环境文件按钮
-        compare_btn = ttk.Button(btn_frame, text="比较环境文件", command=self.compare_environment_files)
-        compare_btn.pack(side=tk.LEFT, padx=5)
+        test_mirror_btn = ttk.Button(mirror_frame, text="测试镜像源", command=self.test_mirror_speed, width=12)
+        test_mirror_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
 
-        # 底部结果显示区域
-        bottom_frame = ttk.Frame(main_frame, padding="5")
-        bottom_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+        file_frame = ttk.LabelFrame(left_frame, text="插件节点依赖文件", padding="10")
+        file_frame.pack(fill=tk.X, pady=5)
+        
+        # 创建标签容器
+        label_container = ttk.Frame(file_frame)
+        label_container.pack(fill=tk.X, pady=2)
+        
+        file_label = ttk.Label(label_container, text="文件路径:", width=10)
+        file_label.pack(side=tk.LEFT, padx=(5, 0))
+
+        self.file_label = ttk.Label(label_container, text="未选择requirements.txt文件", anchor=tk.W)
+        self.file_label.pack(side=tk.LEFT, padx=(2, 5), fill=tk.X, expand=True)
+
+        select_btn = ttk.Button(file_frame, text="选择文件", command=self.select_requirements_file, width=12)
+        select_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
+        
+        # Python环境选择区域 - 调整为pack布局
+        env_frame = ttk.LabelFrame(left_frame, text="电脑当前Python环境", padding="10")
+        env_frame.pack(fill=tk.X, pady=5)
+        
+        # 创建标签容器
+        env_label_container = ttk.Frame(env_frame)
+        env_label_container.pack(fill=tk.X, pady=2)
+        
+        env_label = ttk.Label(env_label_container, text="当前环境:", width=10)
+        env_label.pack(side=tk.LEFT, padx=(5, 0))
+
+        # 根据是否在PATH中找到Python环境显示不同的文本
+        if self.python_exe_path:
+            env_text = f"{self.python_exe_path}"
+        else:
+            env_text = "未选择"
+            
+        self.env_label = ttk.Label(env_label_container, text=env_text, anchor=tk.W)
+        self.env_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        env_btn = ttk.Button(env_frame, text="选择环境", command=self.select_python_environment, width=12)
+        env_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
+        
+        # 中间按钮区域 - 改为与第三方库相同的水平布局
+        btn_frame = ttk.LabelFrame(left_frame, text="ComfyUI环境操作按钮", padding="10")
+        btn_frame.pack(fill=tk.X, pady=8)
+
+        # 创建按钮容器，使用pack布局水平排列
+        btn_container = ttk.Frame(btn_frame)
+        btn_container.pack(fill=tk.X, expand=True)
+
+        # 计算按钮宽度以适应窗口宽度
+        btn_width = 12
+
+        # 第一行按钮
+        check_btn = ttk.Button(btn_container, text="依赖是否冲突", command=self.start_checking, width=btn_width)
+        check_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        simulate_btn = ttk.Button(btn_container, text="依赖模拟安装", command=self.start_simulation, width=btn_width)
+        simulate_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        view_btn = ttk.Button(btn_container, text="查看当前环境", command=self.view_current_env, width=btn_width)
+        view_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        # 第二行按钮
+        btn_container2 = ttk.Frame(btn_frame)
+        btn_container2.pack(fill=tk.X, expand=True)
+
+        # 实际安装按钮
+        self.install_btn = ttk.Button(btn_container2, text="依赖实际安装", command=self.start_installation, width=btn_width)
+        self.install_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        # 比较环境文件按钮
+        compare_btn = ttk.Button(btn_container2, text="比较两次环境", command=self.compare_environment_files, width=btn_width)
+        compare_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        # 查找冲突库按钮
+        conflict_lib_btn = ttk.Button(btn_container2, text="查找环境冲突", command=self.find_conflicting_libraries, width=btn_width)
+        conflict_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        
+        # 添加一个占位元素，将清空信息按钮推到右侧
+        ttk.Label(btn_container2).pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # 清空信息按钮 - 移到第二行最后
+        clear_btn = ttk.Button(btn_container2, text="清空右边信息", command=self.clear_results, width=btn_width)
+        clear_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        # 第三方库管理区域 - 优化布局
+        lib_frame = ttk.LabelFrame(left_frame, text="第三方库管理", padding="10")
+        lib_frame.pack(fill=tk.X, pady=8)
+        
+        # 库名称和版本输入区域
+        lib_input_frame = ttk.Frame(lib_frame)
+        lib_input_frame.pack(fill=tk.X, pady=5)
+        
+        # 库名称下拉框 - 替换原来的输入框，支持历史记录
+        lib_name_label = ttk.Label(lib_input_frame, text="库名称:", width=8)
+        lib_name_label.pack(side=tk.LEFT, padx=(0, 5), fill=tk.Y, expand=True)
+        self.lib_name_var = tk.StringVar()
+        # 创建下拉框，设置为可编辑模式，这样既可以选择历史记录也可以输入新名称
+        self.lib_name_combobox = ttk.Combobox(lib_input_frame, textvariable=self.lib_name_var, width=30, state="normal")
+        self.lib_name_combobox.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        # 设置下拉框样式
+        self.style.configure(
+            "TCombobox",
+            font=("SimHei", 11)
+        )
+        
+        # 版本选择下拉框
+        version_label = ttk.Label(lib_input_frame, text="版本:", width=8)
+        version_label.pack(side=tk.LEFT, padx=5, fill=tk.Y, expand=True)
+        self.version_var = tk.StringVar()
+        self.version_combobox = ttk.Combobox(lib_input_frame, textvariable=self.version_var, width=20, state="readonly")
+        self.version_combobox.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        # 功能按钮区域 - 优化按钮间距和大小
+        lib_btn_frame = ttk.Frame(lib_frame)
+        lib_btn_frame.pack(fill=tk.X, pady=5)
+        
+        # 计算按钮宽度以适应窗口宽度
+        btn_width = 12
+        
+        search_lib_btn = ttk.Button(lib_btn_frame, text="精确查找", command=self.search_library_exact, width=btn_width)
+        search_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+              
+        search_lib_fuzzy_btn = ttk.Button(lib_btn_frame, text="模糊查找", command=self.search_library_local, width=btn_width)
+        search_lib_fuzzy_btn.pack(side=tk.LEFT, padx=8, pady=2)
+              
+        install_lib_btn = ttk.Button(lib_btn_frame, text="安装库", command=self.install_library, width=btn_width)
+        install_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        
+        uninstall_lib_btn = ttk.Button(lib_btn_frame, text="删除库", command=self.uninstall_library, width=btn_width)
+        uninstall_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+
+        # === 右侧面板内容 ===
+        
+        # 结果显示区域 - 优化文本框大小和字体
+        result_frame = ttk.Frame(right_frame, padding="5")
+        result_frame.pack(fill=tk.BOTH, expand=True)
         
         # 创建带滚动条的文本框
-        self.result_text = tk.Text(bottom_frame, wrap=tk.WORD, font=("SimHei", 10))
-        self.result_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        # 使用Frame包裹文本框和滚动条，确保布局稳定
+        text_frame = ttk.Frame(result_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True)
         
-        scrollbar = ttk.Scrollbar(bottom_frame, command=self.result_text.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # 创建文本框，增加选择背景色和撤销功能
+        self.result_text = tk.Text(text_frame, wrap=tk.WORD, font=('SimHei', 11),
+                                  selectbackground="#a6a6a6", selectforeground="black",
+                                  undo=True, maxundo=-1)  # 启用撤销功能
+        self.result_text.grid(row=0, column=0, sticky="nsew")
         
-        self.result_text.config(yscrollcommand=scrollbar.set)
+        # 配置grid权重，使文本框能够随窗口大小调整
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
         
+        # 垂直滚动条 - 保存为实例变量
+        self.v_scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.result_text.yview)
+        self.v_scrollbar.grid(row=0, column=1, sticky="ns")
+        
+        # 水平滚动条 - 保存为实例变量
+        self.h_scrollbar = ttk.Scrollbar(result_frame, orient=tk.HORIZONTAL, command=self.result_text.xview)
+        self.h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # 配置文本框与滚动条的联动
+        self.result_text.config(yscrollcommand=self.v_scrollbar.set)
+        self.result_text.config(xscrollcommand=self.h_scrollbar.set)
+        
+        # === 进度条放在主框架底部 ===
         # 创建进度条
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, maximum=100)
@@ -248,7 +377,7 @@ class EnvironmentCheckerApp:
         
         if file_path:
             self.requirements_path = file_path
-            self.file_label.config(text=f"已选择: {os.path.basename(file_path)}")
+            self.file_label.config(text=f"{file_path}")
             
             # 解析requirements.txt
             try:
@@ -914,6 +1043,424 @@ class EnvironmentCheckerApp:
     def clear_results(self):
         """清空结果文本框"""
         self.result_text.delete(1.0, tk.END)
+    
+    def find_conflicting_libraries(self):
+        """查找当前环境下第三方库之间的冲突"""
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text("开始查找环境中已安装库的冲突...\n\n")
+        
+        # 在新线程中执行查找，避免界面卡顿
+        conflict_thread = Thread(target=self._find_conflicting_libraries_thread)
+        conflict_thread.daemon = True
+        conflict_thread.start()
+    
+    def _check_pip_check_available(self):
+        """检查pip check命令是否可用"""
+        try:
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 运行pip check --help命令来测试是否可用
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'check', '--help'],
+                **kwargs
+            )
+            
+            # 如果返回码为0，说明pip check可用
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def _install_pip_check_if_needed(self):
+        """安装pip check所需的包（实际上pip check是pip自带的功能，但有些版本可能需要更新pip）"""
+        try:
+            self.update_result_text("正在检查并安装pip check所需的组件...\n")
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 更新pip到最新版本
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'install', '--upgrade', 'pip'],
+                **kwargs
+            )
+            
+            return result.returncode == 0
+        except Exception:
+            self.update_result_text("安装pip check组件时出错。\n")
+            return False
+    
+    def _find_conflicting_libraries_thread(self):
+        """在新线程中执行查找冲突库的操作"""
+        try:
+            # 先清空结果
+            self.root.after(0, lambda: self.result_text.delete(1.0, tk.END))
+            
+            # 检查是否已选择Python环境
+            if not self.python_exe_path:
+                self.update_result_text("错误: 请先选择Python环境!\n")
+                self.root.after(0, self.progress_bar.pack_forget)
+                return
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(10))
+            
+            # 首先尝试使用pip check命令检测冲突（用户建议）
+            self.update_result_text("正在使用pip check命令检测库冲突...\n")
+            
+            # 检查pip check是否可用
+            pip_check_available = self._check_pip_check_available()
+            
+            # 如果pip check不可用，尝试安装所需组件
+            if not pip_check_available:
+                self.update_result_text("pip check命令不可用，尝试安装所需组件...\n")
+                pip_check_available = self._install_pip_check_if_needed()
+                
+                # 如果安装后仍然不可用，回退到原来的检查方法
+                if not pip_check_available:
+                    self.update_result_text("无法使用pip check，将回退到依赖分析方法检查冲突...\n\n")
+                    self._fallback_conflict_detection()
+                    return
+            
+            # 使用pip check检测冲突
+            conflicts_from_pip_check = self._run_pip_check()
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(90))
+            
+            # 显示pip check的结果
+            if conflicts_from_pip_check:
+                self.update_result_text(f"pip check 发现 {len(conflicts_from_pip_check)} 个库冲突问题:\n\n")
+                
+                for i, conflict in enumerate(conflicts_from_pip_check, 1):
+                    # 获取冲突消息
+                    message = conflict['message'] if isinstance(conflict, dict) else conflict
+                    self.update_result_text(f"{i}. {message}\n")
+                    
+                    # 如果是结构化的冲突信息，直接使用pipdeptree分析依赖
+                    if isinstance(conflict, dict) and 'package' in conflict and conflict['package']:
+                            pkg_name = conflict['package']
+                            self.update_result_text(f"正在使用 pipdeptree 分析 '{pkg_name}' 的依赖关系...\n")
+                            
+                            # 检查pipdeptree是否可用
+                            if hasattr(self, '_check_pipdeptree_available') and self._check_pipdeptree_available():
+                                # 执行pipdeptree命令并显示结果
+                                try:
+                                    kwargs = {
+                                        'capture_output': True,
+                                        'text': True,
+                                        'check': False
+                                    }
+                                    if os.name == 'nt':
+                                        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+                                    
+                                    result = subprocess.run(
+                                        [self.python_exe_path, '-m', 'pipdeptree', '--reverse', '--packages', pkg_name],
+                                        **kwargs
+                                    )
+                                    
+                                    if result.returncode == 0:
+                                        # 格式化输出结果
+                                        deptree_output = result.stdout.strip()
+                                        if deptree_output:
+                                            self.update_result_text("   依赖分析结果:\n")
+                                            # 每行添加缩进
+                                            for line in deptree_output.split('\n'):
+                                                if line.strip():
+                                                    self.update_result_text(f"     {line}\n")
+                                        else:
+                                            self.update_result_text("   没有找到依赖关系信息。\n")
+                                    else:
+                                        self.update_result_text(f"   执行pipdeptree命令时出错: {result.stderr}\n")
+                                except Exception as e:
+                                    self.update_result_text(f"   执行pipdeptree命令时出错: {str(e)}\n")
+                            else:
+                                # 如果pipdeptree不可用，提供安装建议
+                                self.update_result_text("   pipdeptree工具尚未安装，正在尝试安装...\n")
+                                try:
+                                    # 尝试安装pipdeptree
+                                    install_result = subprocess.run(
+                                        [self.python_exe_path, '-m', 'pip', 'install', 'pipdeptree'],
+                                        capture_output=True,
+                                        text=True
+                                    )
+                                    
+                                    if install_result.returncode == 0:
+                                        self.update_result_text("   pipdeptree安装成功！重新执行分析...\n")
+                                        # 重新执行分析
+                                        try:
+                                            result = subprocess.run(
+                                                [self.python_exe_path, '-m', 'pipdeptree', '--reverse', '--packages', pkg_name],
+                                                capture_output=True,
+                                                text=True
+                                            )
+                                            
+                                            if result.returncode == 0:
+                                                deptree_output = result.stdout.strip()
+                                                if deptree_output:
+                                                    self.update_result_text("   依赖分析结果:\n")
+                                                    for line in deptree_output.split('\n'):
+                                                        if line.strip():
+                                                            self.update_result_text(f"     {line}\n")
+                                        except Exception as e:
+                                            self.update_result_text(f"   安装后执行pipdeptree命令时出错: {str(e)}\n")
+                                    else:
+                                        self.update_result_text(f"   安装pipdeptree失败: {install_result.stderr}\n")
+                                        self.update_result_text(f"   请手动安装: python -m pip install pipdeptree\n")
+                                except Exception as e:
+                                    self.update_result_text(f"   安装pipdeptree时出错: {str(e)}\n")
+                                    self.update_result_text(f"   请手动安装: python -m pip install pipdeptree\n")
+                    
+                    # 为每个冲突提供建议
+                    suggestion = self._get_conflict_suggestion(message)
+                    if suggestion:
+                        # 处理建议中的换行符
+                        suggestion_lines = suggestion.split('\n')
+                        for line in suggestion_lines:
+                            if line.strip():
+                                self.update_result_text(f"   {line}\n")
+                    
+                    self.update_result_text("\n")
+                
+                self.update_result_text("请使用上方推荐的pipdeptree命令分析冲突包的依赖关系，根据分析结果解决冲突。\n")
+            else:
+                self.update_result_text("pip check未发现明显的库冲突问题。\n\n")
+                self.update_result_text("环境中的库依赖关系良好！\n")
+                
+            self.update_result_text("冲突检查完成！\n")
+            
+        except Exception as e:
+            self.update_result_text(f"查找冲突时出错: {str(e)}\n")
+            # 出错时回退到原来的检查方法
+            self.update_result_text("将回退到依赖分析方法继续检查...\n\n")
+            try:
+                self._fallback_conflict_detection()
+            except:
+                pass
+        finally:
+            # 在主线程中隐藏进度条
+            self.root.after(0, self.progress_bar.pack_forget)
+    
+    def _run_pip_check(self):
+        """运行pip check命令并解析结果，提供结构化的冲突信息"""
+        try:
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            self.update_result_text("正在执行pip check命令...\n")
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'check'],
+                **kwargs
+            )
+            
+            conflicts = []
+            
+            # pip check在发现冲突时会返回非零退出码
+            if result.returncode != 0:
+                # 解析错误输出
+                error_output = result.stdout + result.stderr
+                
+                # 处理输出中的每一行
+                for line in error_output.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('No broken requirements'):
+                        # 创建结构化的冲突信息，便于后续处理
+                        conflict_info = {
+                            'message': line,
+                            'package': None
+                        }
+                        
+                        # 尝试从冲突消息中提取包名（通常是第一个单词）
+                        words = line.split()
+                        if words:
+                            conflict_info['package'] = words[0]
+                        
+                        conflicts.append(conflict_info)
+            
+            return conflicts
+        except Exception as e:
+            self.update_result_text(f"运行pip check时出错: {str(e)}\n")
+            return []
+    
+    def _get_conflict_suggestion(self, conflict_message):
+        """为冲突提供解决建议"""
+        try:
+            # 根据冲突消息提供建议
+            if 'requires' in conflict_message.lower():
+                # 解析冲突的包名
+                words = conflict_message.split()
+                package_name = None
+                
+                # 尝试找到包名（通常是第一个单词）
+                if words:
+                    package_name = words[0]
+                    
+                if package_name:
+                    return f"使用 pipdeptree 分析 '{package_name}' 的依赖关系: python -m pipdeptree --reverse --packages {package_name}\n   根据分析结果确定冲突来源和解决方案"
+                
+            return "使用 pipdeptree 分析依赖关系: python -m pipdeptree --reverse --packages 包名\n   根据分析结果确定冲突来源和解决方案"        
+        except:
+            return None
+    
+    def _fallback_conflict_detection(self):
+        """回退到使用pipdeptree进行依赖分析的方法"""
+        try:
+            # 获取已安装的所有包及其版本信息
+            self.update_result_text("正在获取已安装的所有第三方库...\n")
+            packages_with_versions = self._get_all_installed_packages_with_versions()
+            
+            if not packages_with_versions:
+                self.update_result_text("未能获取已安装的库信息，可能是Python环境配置有问题。\n")
+                return
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(30))
+            installed_packages = list(packages_with_versions.keys())
+            self.update_result_text(f"成功获取了 {len(installed_packages)} 个已安装的库\n\n")
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(60))
+            
+            # 检查pipdeptree是否已安装
+            self.update_result_text("正在检查pipdeptree工具是否已安装...\n")
+            is_pipdeptree_installed = self._check_pipdeptree_available()
+            
+            if not is_pipdeptree_installed:
+                self.update_result_text("pipdeptree工具尚未安装，建议安装该工具以获得更详细的依赖分析。\n")
+                self.update_result_text("安装命令: python -m pip install pipdeptree\n\n")
+            else:
+                self.update_result_text("pipdeptree工具已安装，可以使用它进行详细的依赖分析。\n")
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(90))
+            
+            # 提供使用pipdeptree进行依赖分析的建议
+            self.update_result_text("\n推荐使用以下命令进行详细的依赖关系分析：\n")
+            self.update_result_text("1. 查看所有包的依赖树：python -m pipdeptree\n")
+            self.update_result_text("2. 查看特定包的依赖关系：python -m pipdeptree --packages 包名\n")
+            self.update_result_text("3. 查看哪些包依赖于特定包：python -m pipdeptree --reverse --packages 包名\n")
+            self.update_result_text("4. 导出依赖关系到文件：python -m pipdeptree > dependencies.txt\n\n")
+            
+            self.update_result_text("使用pipdeptree工具可以更清晰地了解包之间的依赖关系，帮助排查和解决冲突问题。\n")
+            self.update_result_text("依赖分析完成！\n")
+            
+        except Exception as e:
+            self.update_result_text(f"回退分析过程中出错: {str(e)}\n")
+    
+    def _check_pipdeptree_available(self):
+        """检查pipdeptree工具是否可用"""
+        try:
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 运行pipdeptree --help命令来测试是否可用
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pipdeptree', '--help'],
+                **kwargs
+            )
+            
+            # 如果返回码为0，说明pipdeptree可用
+            return result.returncode == 0
+        except Exception:
+            return False
+    
+    def _get_all_installed_packages(self):
+        """获取当前Python环境中所有已安装的包"""
+        try:
+            # 使用pip list命令获取已安装包
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            # Windows平台添加creationflags参数隐藏控制台窗口
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'list', '--format=columns'],
+                **kwargs
+            )
+            
+            packages = []
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[2:]  # 跳过表头
+                for line in lines:
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 1:
+                            packages.append(parts[0])
+            
+            return packages
+        except Exception:
+            return []
+            
+    def _get_all_installed_packages_with_versions(self):
+        """一次性获取所有已安装包及其版本信息（性能优化）"""
+        try:
+            kwargs = {
+                'capture_output': True,
+                'text': True,
+                'check': False
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 尝试使用JSON格式获取包信息，这比多次调用pip show要快得多
+            try:
+                result = subprocess.run(
+                    [self.python_exe_path, '-m', 'pip', 'list', '--format=json'],
+                    **kwargs
+                )
+                
+                if result.returncode == 0 and result.stdout:
+                    import json
+                    packages_data = json.loads(result.stdout)
+                    return {pkg['name']: pkg['version'] for pkg in packages_data}
+            except:
+                # JSON格式不可用，回退到普通格式
+                pass
+            
+            # 回退方法：使用普通格式解析
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'list', '--format=columns'],
+                **kwargs
+            )
+            
+            packages = {}
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[2:]  # 跳过表头
+                for line in lines:
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            packages[parts[0]] = parts[1]
+            
+            return packages
+        except Exception:
+            return {}
+
         
     def compare_environment_files(self):
         """比较两个环境文件的差异"""
@@ -1108,8 +1655,17 @@ class EnvironmentCheckerApp:
     def update_result_text(self, text):
         """更新结果文本框，确保在主线程中执行"""
         def _update_text():
-            self.result_text.insert(tk.END, text)
-            self.result_text.see(tk.END)
+            try:
+                # 保存当前的滚动位置
+                current_pos = self.result_text.yview()[1]
+                # 插入新文本
+                self.result_text.insert(tk.END, text)
+                # 如果滚动条已经在底部，则自动滚动到底部
+                if current_pos > 0.95:  # 如果滚动条接近底部
+                    self.result_text.see(tk.END)
+            except tk.TclError:
+                # 如果文本框已被销毁，忽略错误
+                pass
         
         # 检查是否在主线程中，如果不是则通过after在主线程中执行
         if self.root._windowingsystem is not None and self.root.winfo_exists():
@@ -1117,6 +1673,401 @@ class EnvironmentCheckerApp:
         else:
             # 如果窗口已关闭，不进行更新
             pass
+            
+    def search_library_exact(self):
+        """精确查找第三方库并获取版本列表"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 检查是否输入了库名称
+        lib_name = self.lib_name_var.get().strip()
+        if not lib_name:
+            messagebox.showwarning("警告", "请输入要查找的库名称")
+            return
+        
+        # 将使用过的库名添加到历史记录中（如果不存在）
+        self._add_to_lib_history(lib_name)
+            
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text(f"正在精确搜索库 {lib_name} ...\n\n")
+        
+        # 在新线程中执行精确搜索
+        search_thread = Thread(target=self._search_library_thread, args=(lib_name,))
+        search_thread.daemon = True
+        search_thread.start()
+        
+    def search_library_local(self):
+        """从本地环境中模糊查找第三方库"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 弹出输入框让用户输入模糊查找的字符
+        search_term = simpledialog.askstring(
+            "模糊查找", 
+            "请输入要模糊查找的库名称字符：",
+            parent=self.root
+        )
+        
+        # 如果用户点击了取消按钮
+        if search_term is None:
+            return
+            
+        # 去除首尾空格
+        search_term = search_term.strip()
+        
+        # 如果输入为空
+        if not search_term:
+            messagebox.showwarning("警告", "搜索字符不能为空")
+            return
+            
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text(f"正在本地环境中模糊查找匹配 '{search_term}' 的库...\n\n")
+        
+        # 在新线程中执行本地模糊搜索
+        search_thread = Thread(target=self._search_library_local_thread, args=(search_term,))
+        search_thread.daemon = True
+        search_thread.start()
+        
+    def _search_library_local_thread(self, search_term):
+        """在新线程中从本地环境模糊查找库"""
+        try:
+            # Windows系统专用实现
+            # 使用 pip list | findstr 命令查找匹配的库
+            cmd = f"{self.python_exe_path} -m pip list | findstr /I /C:{search_term}"
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'text': True,
+                'shell': True,
+                'creationflags': subprocess.CREATE_NO_WINDOW
+            }
+            
+            # 执行命令
+            result = subprocess.run(cmd, **kwargs)
+            
+            # 处理结果
+            if result.returncode == 0:
+                # 命令执行成功，有匹配结果
+                output_lines = result.stdout.strip().split('\n')
+                self.update_result_text(f"在本地环境中找到 {len(output_lines)} 个匹配的库:\n\n")
+                
+                # 显示匹配的库和版本
+                for line in output_lines:
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        lib_name = parts[0]
+                        version = parts[1]
+                        self.update_result_text(f"{lib_name}  (版本: {version})\n")
+                    else:
+                        self.update_result_text(f"{line}\n")
+                
+                self.update_result_text("\n")
+            else:
+                # 命令执行失败，可能没有匹配结果
+                self.update_result_text(f"未在本地环境中找到匹配 '{search_term}' 的库\n\n")
+            
+            if result.stderr:
+                # 如果有错误输出，也显示出来
+                self.update_result_text(f"警告: {result.stderr}\n\n")
+        except Exception as e:
+            self.update_result_text(f"本地查找库时出错: {str(e)}\n\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
+        
+    def _search_library_thread(self, lib_name):
+        """在新线程中查找库信息和版本列表"""
+        try:
+            # 先检查当前环境是否已安装该库
+            self._check_installed_library(lib_name)
+            
+            # 然后查找该库的可用版本列表
+            self._get_library_versions(lib_name)
+        except Exception as e:
+            self.update_result_text(f"查找库信息时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
+            
+    def _check_installed_library(self, lib_name):
+        """检查当前环境是否已安装指定库"""
+        try:
+            # 使用pip show命令检查库是否已安装
+            kwargs = {
+                'capture_output': True,
+                'text': True
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            result = subprocess.run(
+                [self.python_exe_path, '-m', 'pip', 'show', lib_name],
+                **kwargs
+            )
+            
+            if result.returncode == 0:
+                # 库已安装，解析输出获取版本信息
+                output_lines = result.stdout.strip().split('\n')
+                version_line = next((line for line in output_lines if line.startswith('Version: ')), None)
+                if version_line:
+                    version = version_line.split('Version: ')[1]
+                    self.update_result_text(f"库 {lib_name} 已安装在当前环境中，版本: {version}\n\n")
+                else:
+                    self.update_result_text(f"库 {lib_name} 已安装在当前环境中\n\n")
+            else:
+                self.update_result_text(f"库 {lib_name} 未安装在当前环境中\n\n")
+        except Exception as e:
+            self.update_result_text(f"检查库安装状态时出错: {str(e)}\n")
+            
+    def _get_library_versions(self, lib_name):
+        """获取指定库的可用版本列表"""
+        try:
+            # 使用pip index versions命令获取版本列表（需要pip 21.2+）
+            kwargs = {
+                'capture_output': True,
+                'text': True
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 构建命令
+            command = [self.python_exe_path, '-m', 'pip', 'index', 'versions', lib_name]
+            
+            # 添加镜像源参数（如果有）
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                command.extend(['--index-url', mirror_url])
+                command.append('--trusted-host')
+                command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+            
+            result = subprocess.run(command, **kwargs)
+            
+            # 处理输出，提取版本信息
+            if result.returncode == 0:
+                output_lines = result.stdout.strip().split('\n')
+                version_line = next((line for line in output_lines if 'Available versions:' in line), None)
+                
+                if version_line:
+                    # 提取版本信息
+                    versions_text = version_line.split('Available versions: ')[1]
+                    versions = [v.strip() for v in versions_text.split(',')]
+                    
+                    self.update_result_text(f"库 {lib_name} 的可用版本: {', '.join(versions)}\n\n")
+                    
+                    # 在主线程中更新版本下拉框
+                    def update_version_combobox(versions_list):
+                        self.version_combobox['values'] = versions_list
+                        if versions_list:
+                            self.version_combobox.current(0)
+                    
+                    self.root.after(0, update_version_combobox, versions)
+                else:
+                    self.update_result_text(f"未找到库 {lib_name} 的版本信息\n\n")
+            else:
+                # 如果pip index versions命令失败，尝试使用pip install --dry-run来获取版本信息
+                self.update_result_text(f"尝试使用替代方法获取版本信息...\n")
+                self._get_library_versions_alt(lib_name)
+        except Exception as e:
+            self.update_result_text(f"获取版本列表时出错: {str(e)}\n")
+            # 尝试使用替代方法
+            self._get_library_versions_alt(lib_name)
+            
+    def _get_library_versions_alt(self, lib_name):
+        """获取版本列表的替代方法"""
+        try:
+            # 使用pip install --dry-run命令获取版本信息
+            kwargs = {
+                'capture_output': True,
+                'text': True
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            # 构建命令
+            command = [self.python_exe_path, '-m', 'pip', 'install', f'{lib_name}==*', '--dry-run']
+            
+            # 添加镜像源参数（如果有）
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                command.extend(['--index-url', mirror_url])
+                command.append('--trusted-host')
+                command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+            
+            result = subprocess.run(command, **kwargs)
+            
+            # 解析错误输出中的版本信息（因为==*是无效的版本号）
+            if result.returncode != 0:
+                # 从stderr中提取有效的版本信息
+                error_output = result.stderr
+                if 'versions: ' in error_output:
+                    versions_part = error_output.split('versions: ')[1].split('\n')[0]
+                    versions = [v.strip() for v in versions_part.split(',')]
+                    
+                    self.update_result_text(f"库 {lib_name} 的可用版本: {', '.join(versions)}\n\n")
+                    
+                    # 在主线程中更新版本下拉框
+                    def update_version_combobox_alt(versions_list):
+                        self.version_combobox['values'] = versions_list
+                        if versions_list:
+                            self.version_combobox.current(0)
+                    
+                    self.root.after(0, update_version_combobox_alt, versions)
+        except Exception as e:
+            self.update_result_text(f"使用替代方法获取版本列表时出错: {str(e)}\n")
+            
+    def install_library(self):
+        """安装指定版本的第三方库"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 检查是否输入了库名称
+        lib_name = self.lib_name_var.get().strip()
+        if not lib_name:
+            messagebox.showwarning("警告", "请输入要安装的库名称")
+            return
+        
+        # 将使用过的库名添加到历史记录中（如果不存在）
+        self._add_to_lib_history(lib_name)
+            
+        # 获取选择的版本
+        version = self.version_var.get().strip()
+        
+        # 构建安装命令
+        if version:
+            install_target = f"{lib_name}=={version}"
+        else:
+            install_target = lib_name
+            
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text(f"正在安装库 {install_target}...\n\n")
+        
+        # 在新线程中执行安装
+        install_thread = Thread(target=self._install_library_thread, args=(install_target,))
+        install_thread.daemon = True
+        install_thread.start()
+        
+    def _install_library_thread(self, install_target):
+        """在新线程中安装库"""
+        try:
+            # 构建pip install命令
+            command = [self.python_exe_path, '-m', 'pip', 'install', install_target]
+            
+            # 添加镜像源参数
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                command.extend(['-i', mirror_url])
+                command.append('--trusted-host')
+                command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+            
+            # 执行命令
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'text': True
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            process = subprocess.Popen(command, **kwargs)
+            
+            # 实时显示输出
+            for line in process.stdout:
+                self.update_result_text(line)
+                
+            for line in process.stderr:
+                self.update_result_text(line)
+            
+            # 等待进程完成
+            process.wait()
+            
+            if process.returncode == 0:
+                self.root.after(0, lambda: messagebox.showinfo("安装成功", f"库 {install_target} 安装成功!"))
+            else:
+                self.root.after(0, lambda: messagebox.showerror("安装失败", f"库 {install_target} 安装失败!"))
+        except Exception as e:
+            self.update_result_text(f"安装库时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
+            
+    def uninstall_library(self):
+        """删除指定的第三方库"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 检查是否输入了库名称
+        lib_name = self.lib_name_var.get().strip()
+        if not lib_name:
+            messagebox.showwarning("警告", "请输入要删除的库名称")
+            return
+        
+        # 将使用过的库名添加到历史记录中（如果不存在）
+        self._add_to_lib_history(lib_name)
+            
+        # 确认删除
+        if not messagebox.askyesno("确认删除", f"确定要删除库 {lib_name} 吗？"):
+            return
+            
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(0)
+        self.update_result_text(f"正在删除库 {lib_name}...\n\n")
+        
+        # 在新线程中执行删除
+        uninstall_thread = Thread(target=self._uninstall_library_thread, args=(lib_name,))
+        uninstall_thread.daemon = True
+        uninstall_thread.start()
+        
+    def _uninstall_library_thread(self, lib_name):
+        """在新线程中删除库"""
+        try:
+            # 构建pip uninstall命令
+            command = [self.python_exe_path, '-m', 'pip', 'uninstall', lib_name, '-y']
+            
+            # 执行命令
+            kwargs = {
+                'stdout': subprocess.PIPE,
+                'stderr': subprocess.PIPE,
+                'text': True
+            }
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            
+            process = subprocess.Popen(command, **kwargs)
+            
+            # 实时显示输出
+            for line in process.stdout:
+                self.update_result_text(line)
+                
+            for line in process.stderr:
+                self.update_result_text(line)
+            
+            # 等待进程完成
+            process.wait()
+            
+            if process.returncode == 0:
+                self.root.after(0, lambda: messagebox.showinfo("删除成功", f"库 {lib_name} 删除成功!"))
+            else:
+                self.root.after(0, lambda: messagebox.showerror("删除失败", f"库 {lib_name} 删除失败!"))
+        except Exception as e:
+            self.update_result_text(f"删除库时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
             
     def on_mirror_change(self, event=None):
         """处理镜像源选择变化"""
@@ -1140,6 +2091,14 @@ class EnvironmentCheckerApp:
         test_thread = Thread(target=self._perform_mirror_test)
         test_thread.daemon = True
         test_thread.start()
+        
+    def _add_to_lib_history(self, lib_name):
+        """将库名称添加到历史记录中"""
+        # 避免重复添加
+        if lib_name and lib_name not in self.lib_history:
+            self.lib_history.append(lib_name)
+            # 更新下拉框的值列表
+            self.lib_name_combobox['values'] = self.lib_history
         
     def _perform_mirror_test(self):
         """执行镜像源测试并返回测试结果"""
