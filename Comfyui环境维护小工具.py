@@ -290,7 +290,7 @@ class EnvironmentCheckerApp:
         lib_input_frame.pack(fill=tk.X, pady=5)
         
         # 库名称下拉框 - 替换原来的输入框，支持历史记录
-        lib_name_label = ttk.Label(lib_input_frame, text="库名称:", width=8)
+        lib_name_label = ttk.Label(lib_input_frame, text="环境库名:", width=9)
         lib_name_label.pack(side=tk.LEFT, padx=(0, 5), fill=tk.Y, expand=True)
         self.lib_name_var = tk.StringVar()
         # 创建下拉框，设置为可编辑模式，这样既可以选择历史记录也可以输入新名称
@@ -303,7 +303,7 @@ class EnvironmentCheckerApp:
         )
         
         # 版本选择下拉框
-        version_label = ttk.Label(lib_input_frame, text="版本:", width=8)
+        version_label = ttk.Label(lib_input_frame, text="版本号:", width=7)
         version_label.pack(side=tk.LEFT, padx=5, fill=tk.Y, expand=True)
         self.version_var = tk.StringVar()
         self.version_combobox = ttk.Combobox(lib_input_frame, textvariable=self.version_var, width=20, state="readonly")
@@ -314,19 +314,19 @@ class EnvironmentCheckerApp:
         lib_btn_frame.pack(fill=tk.X, pady=5)
         
         # 计算按钮宽度以适应窗口宽度
-        btn_width = 12
+        btn_width = 10
         
         search_lib_btn = ttk.Button(lib_btn_frame, text="精确查找", command=self.search_library_exact, width=btn_width)
-        search_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        search_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
               
         search_lib_fuzzy_btn = ttk.Button(lib_btn_frame, text="模糊查找", command=self.search_library_local, width=btn_width)
-        search_lib_fuzzy_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        search_lib_fuzzy_btn.pack(side=tk.LEFT, padx=10, pady=2)
               
         install_lib_btn = ttk.Button(lib_btn_frame, text="安装库", command=self.install_library, width=btn_width)
-        install_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        install_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
         
         uninstall_lib_btn = ttk.Button(lib_btn_frame, text="删除库", command=self.uninstall_library, width=btn_width)
-        uninstall_lib_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        uninstall_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
 
         # === 右侧面板内容 ===
         
@@ -339,10 +339,9 @@ class EnvironmentCheckerApp:
         text_frame = ttk.Frame(result_frame)
         text_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 创建文本框，增加选择背景色和撤销功能
+        # 创建文本框，增加选择背景色
         self.result_text = tk.Text(text_frame, wrap=tk.WORD, font=('SimHei', 11),
-                                  selectbackground="#a6a6a6", selectforeground="black",
-                                  undo=True, maxundo=-1)  # 启用撤销功能
+                                  bg="white", selectbackground="#a6a6a6", selectforeground="black")  # 显式设置白色背景，移除撤销功能
         self.result_text.grid(row=0, column=0, sticky="nsew")
         
         # 配置grid权重，使文本框能够随窗口大小调整
@@ -360,6 +359,11 @@ class EnvironmentCheckerApp:
         # 配置文本框与滚动条的联动
         self.result_text.config(yscrollcommand=self.v_scrollbar.set)
         self.result_text.config(xscrollcommand=self.h_scrollbar.set)
+        
+        # 添加选择文本复制功能
+        self.result_text.bind('<Control-c>', self.copy_selected_text)
+        # 确保文本框可以被选中
+        self.result_text.config(state=tk.NORMAL)
         
         # === 进度条放在主框架底部 ===
         # 创建进度条
@@ -1044,6 +1048,21 @@ class EnvironmentCheckerApp:
         """清空结果文本框"""
         self.result_text.delete(1.0, tk.END)
     
+    def copy_selected_text(self, event=None):
+        """复制选中的文本到剪贴板"""
+        try:
+            # 获取选中的文本
+            selected_text = self.result_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+            # 将文本复制到剪贴板
+            self.root.clipboard_clear()
+            self.root.clipboard_append(selected_text)
+            # 确认复制成功的反馈（可选）
+            # self.update_result_text(f"已复制文本: {selected_text[:30]}...\n")
+        except tk.TclError:
+            # 没有选中任何文本
+            pass
+        return "break"  # 阻止事件继续传播
+    
     def find_conflicting_libraries(self):
         """查找当前环境下第三方库之间的冲突"""
         # 显示进度条
@@ -1116,7 +1135,7 @@ class EnvironmentCheckerApp:
             # 更新进度
             self.root.after(0, lambda: self.progress_var.set(10))
             
-            # 首先尝试使用pip check命令检测冲突（用户建议）
+            # 使用pip check命令检测冲突
             self.update_result_text("正在使用pip check命令检测库冲突...\n")
             
             # 检查pip check是否可用
@@ -1127,10 +1146,9 @@ class EnvironmentCheckerApp:
                 self.update_result_text("pip check命令不可用，尝试安装所需组件...\n")
                 pip_check_available = self._install_pip_check_if_needed()
                 
-                # 如果安装后仍然不可用，回退到原来的检查方法
+                # 如果安装后仍然不可用，提示用户
                 if not pip_check_available:
-                    self.update_result_text("无法使用pip check，将回退到依赖分析方法检查冲突...\n\n")
-                    self._fallback_conflict_detection()
+                    self.update_result_text("无法使用pip check，请手动检查您的Python环境。\n\n")
                     return
             
             # 使用pip check检测冲突
@@ -1148,80 +1166,6 @@ class EnvironmentCheckerApp:
                     message = conflict['message'] if isinstance(conflict, dict) else conflict
                     self.update_result_text(f"{i}. {message}\n")
                     
-                    # 如果是结构化的冲突信息，直接使用pipdeptree分析依赖
-                    if isinstance(conflict, dict) and 'package' in conflict and conflict['package']:
-                            pkg_name = conflict['package']
-                            self.update_result_text(f"正在使用 pipdeptree 分析 '{pkg_name}' 的依赖关系...\n")
-                            
-                            # 检查pipdeptree是否可用
-                            if hasattr(self, '_check_pipdeptree_available') and self._check_pipdeptree_available():
-                                # 执行pipdeptree命令并显示结果
-                                try:
-                                    kwargs = {
-                                        'capture_output': True,
-                                        'text': True,
-                                        'check': False
-                                    }
-                                    if os.name == 'nt':
-                                        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-                                    
-                                    result = subprocess.run(
-                                        [self.python_exe_path, '-m', 'pipdeptree', '--reverse', '--packages', pkg_name],
-                                        **kwargs
-                                    )
-                                    
-                                    if result.returncode == 0:
-                                        # 格式化输出结果
-                                        deptree_output = result.stdout.strip()
-                                        if deptree_output:
-                                            self.update_result_text("   依赖分析结果:\n")
-                                            # 每行添加缩进
-                                            for line in deptree_output.split('\n'):
-                                                if line.strip():
-                                                    self.update_result_text(f"     {line}\n")
-                                        else:
-                                            self.update_result_text("   没有找到依赖关系信息。\n")
-                                    else:
-                                        self.update_result_text(f"   执行pipdeptree命令时出错: {result.stderr}\n")
-                                except Exception as e:
-                                    self.update_result_text(f"   执行pipdeptree命令时出错: {str(e)}\n")
-                            else:
-                                # 如果pipdeptree不可用，提供安装建议
-                                self.update_result_text("   pipdeptree工具尚未安装，正在尝试安装...\n")
-                                try:
-                                    # 尝试安装pipdeptree
-                                    install_result = subprocess.run(
-                                        [self.python_exe_path, '-m', 'pip', 'install', 'pipdeptree'],
-                                        capture_output=True,
-                                        text=True
-                                    )
-                                    
-                                    if install_result.returncode == 0:
-                                        self.update_result_text("   pipdeptree安装成功！重新执行分析...\n")
-                                        # 重新执行分析
-                                        try:
-                                            result = subprocess.run(
-                                                [self.python_exe_path, '-m', 'pipdeptree', '--reverse', '--packages', pkg_name],
-                                                capture_output=True,
-                                                text=True
-                                            )
-                                            
-                                            if result.returncode == 0:
-                                                deptree_output = result.stdout.strip()
-                                                if deptree_output:
-                                                    self.update_result_text("   依赖分析结果:\n")
-                                                    for line in deptree_output.split('\n'):
-                                                        if line.strip():
-                                                            self.update_result_text(f"     {line}\n")
-                                        except Exception as e:
-                                            self.update_result_text(f"   安装后执行pipdeptree命令时出错: {str(e)}\n")
-                                    else:
-                                        self.update_result_text(f"   安装pipdeptree失败: {install_result.stderr}\n")
-                                        self.update_result_text(f"   请手动安装: python -m pip install pipdeptree\n")
-                                except Exception as e:
-                                    self.update_result_text(f"   安装pipdeptree时出错: {str(e)}\n")
-                                    self.update_result_text(f"   请手动安装: python -m pip install pipdeptree\n")
-                    
                     # 为每个冲突提供建议
                     suggestion = self._get_conflict_suggestion(message)
                     if suggestion:
@@ -1229,11 +1173,9 @@ class EnvironmentCheckerApp:
                         suggestion_lines = suggestion.split('\n')
                         for line in suggestion_lines:
                             if line.strip():
-                                self.update_result_text(f"   {line}\n")
+                                self.update_result_text(f"{line}\n")
                     
                     self.update_result_text("\n")
-                
-                self.update_result_text("请使用上方推荐的pipdeptree命令分析冲突包的依赖关系，根据分析结果解决冲突。\n")
             else:
                 self.update_result_text("pip check未发现明显的库冲突问题。\n\n")
                 self.update_result_text("环境中的库依赖关系良好！\n")
@@ -1242,12 +1184,7 @@ class EnvironmentCheckerApp:
             
         except Exception as e:
             self.update_result_text(f"查找冲突时出错: {str(e)}\n")
-            # 出错时回退到原来的检查方法
-            self.update_result_text("将回退到依赖分析方法继续检查...\n\n")
-            try:
-                self._fallback_conflict_detection()
-            except:
-                pass
+            self.update_result_text("请检查您的Python环境并尝试重新运行。\n\n")
         finally:
             # 在主线程中隐藏进度条
             self.root.after(0, self.progress_bar.pack_forget)
@@ -1312,79 +1249,12 @@ class EnvironmentCheckerApp:
                     package_name = words[0]
                     
                 if package_name:
-                    return f"使用 pipdeptree 分析 '{package_name}' 的依赖关系: python -m pipdeptree --reverse --packages {package_name}\n   根据分析结果确定冲突来源和解决方案"
+                    return f"使用pipdeptree分析'{package_name}'的依赖关系: python -m pipdeptree --reverse --packages {package_name}\n根据树形结构分析结果确定冲突来源和解决方案"
                 
-            return "使用 pipdeptree 分析依赖关系: python -m pipdeptree --reverse --packages 包名\n   根据分析结果确定冲突来源和解决方案"        
+            return "使用pipdeptree分析依赖关系: python -m pipdeptree --reverse --packages 包名\n根据树形结构分析结果确定冲突来源和解决方案"
         except:
             return None
-    
-    def _fallback_conflict_detection(self):
-        """回退到使用pipdeptree进行依赖分析的方法"""
-        try:
-            # 获取已安装的所有包及其版本信息
-            self.update_result_text("正在获取已安装的所有第三方库...\n")
-            packages_with_versions = self._get_all_installed_packages_with_versions()
-            
-            if not packages_with_versions:
-                self.update_result_text("未能获取已安装的库信息，可能是Python环境配置有问题。\n")
-                return
-            
-            # 更新进度
-            self.root.after(0, lambda: self.progress_var.set(30))
-            installed_packages = list(packages_with_versions.keys())
-            self.update_result_text(f"成功获取了 {len(installed_packages)} 个已安装的库\n\n")
-            
-            # 更新进度
-            self.root.after(0, lambda: self.progress_var.set(60))
-            
-            # 检查pipdeptree是否已安装
-            self.update_result_text("正在检查pipdeptree工具是否已安装...\n")
-            is_pipdeptree_installed = self._check_pipdeptree_available()
-            
-            if not is_pipdeptree_installed:
-                self.update_result_text("pipdeptree工具尚未安装，建议安装该工具以获得更详细的依赖分析。\n")
-                self.update_result_text("安装命令: python -m pip install pipdeptree\n\n")
-            else:
-                self.update_result_text("pipdeptree工具已安装，可以使用它进行详细的依赖分析。\n")
-            
-            # 更新进度
-            self.root.after(0, lambda: self.progress_var.set(90))
-            
-            # 提供使用pipdeptree进行依赖分析的建议
-            self.update_result_text("\n推荐使用以下命令进行详细的依赖关系分析：\n")
-            self.update_result_text("1. 查看所有包的依赖树：python -m pipdeptree\n")
-            self.update_result_text("2. 查看特定包的依赖关系：python -m pipdeptree --packages 包名\n")
-            self.update_result_text("3. 查看哪些包依赖于特定包：python -m pipdeptree --reverse --packages 包名\n")
-            self.update_result_text("4. 导出依赖关系到文件：python -m pipdeptree > dependencies.txt\n\n")
-            
-            self.update_result_text("使用pipdeptree工具可以更清晰地了解包之间的依赖关系，帮助排查和解决冲突问题。\n")
-            self.update_result_text("依赖分析完成！\n")
-            
-        except Exception as e:
-            self.update_result_text(f"回退分析过程中出错: {str(e)}\n")
-    
-    def _check_pipdeptree_available(self):
-        """检查pipdeptree工具是否可用"""
-        try:
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-            
-            # 运行pipdeptree --help命令来测试是否可用
-            result = subprocess.run(
-                [self.python_exe_path, '-m', 'pipdeptree', '--help'],
-                **kwargs
-            )
-            
-            # 如果返回码为0，说明pipdeptree可用
-            return result.returncode == 0
-        except Exception:
-            return False
-    
+  
     def _get_all_installed_packages(self):
         """获取当前Python环境中所有已安装的包"""
         try:
@@ -1532,7 +1402,7 @@ class EnvironmentCheckerApp:
             self.root.after(0, lambda: self.progress_var.set(60))
             
             # 比较两个文件的差异
-            added, removed, changed = self._compare_environment_packages(packages1, packages2)
+            added, removed, changed = self._compare_environment_packages(packages1, packages2, file1_path, file2_path)
             
             # 显示比较结果
             self._show_comparison_results(file1_path, file2_path, added, removed, changed)
@@ -1596,8 +1466,12 @@ class EnvironmentCheckerApp:
         
         return packages
         
-    def _compare_environment_packages(self, packages1, packages2):
+    def _compare_environment_packages(self, packages1, packages2, file1_path=None, file2_path=None):
         """比较两个环境的包信息，返回差异"""
+        # 添加日志，明确标识哪个文件对应哪个包列表
+        if file1_path and file2_path:
+            self.update_result_text(f"正在比较包信息: 文件1({os.path.basename(file1_path)}) vs 文件2({os.path.basename(file2_path)})\n")
+        
         added = []      # 在packages2中但不在packages1中的包
         removed = []    # 在packages1中但不在packages2中的包
         changed = []    # 在两个环境中但版本不同的包
@@ -1707,12 +1581,36 @@ class EnvironmentCheckerApp:
             messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
             return
             
-        # 弹出输入框让用户输入模糊查找的字符
-        search_term = simpledialog.askstring(
+        # 创建自定义对话框类，支持设置图标
+        class CustomAskStringDialog(simpledialog._QueryString):
+            def __init__(self, parent, title, prompt, icon_path=None):
+                self.icon_path = icon_path
+                super().__init__(parent, title, prompt)
+            
+            def body(self, master):
+                body = super().body(master)
+                # 设置对话框图标
+                if self.icon_path and os.path.exists(self.icon_path):
+                    try:
+                        self.iconbitmap(self.icon_path)
+                    except:
+                        # 图标设置失败不影响程序运行
+                        pass
+                return body
+        
+        # 弹出输入框让用户输入模糊查找的字符，使用自定义对话框并设置图标
+        icon_path = "favicon.ico"
+        if not os.path.exists(icon_path):
+            # 如果相对路径不存在，使用程序所在目录
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.ico")
+            
+        dialog = CustomAskStringDialog(
+            self.root, 
             "模糊查找", 
             "请输入要模糊查找的库名称字符：",
-            parent=self.root
+            icon_path
         )
+        search_term = dialog.result
         
         # 如果用户点击了取消按钮
         if search_term is None:
@@ -2224,41 +2122,30 @@ class EnvironmentCheckerApp:
 
 
 if __name__ == "__main__":
-    # 实现单例应用功能
+    # 实现单例应用功能（仅支持Windows平台）
     import atexit
     import sys
     
-    # 根据不同操作系统选择不同的单例实现方式
+    # 单例实现 - 仅Windows平台
     is_single_instance = True
     lock_file = None
     lock_file_path = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     
     try:
-        if sys.platform.startswith('win'):
-            # Windows平台实现
-            import msvcrt
-            lock_file = open(lock_file_path, 'w')
-            # 使用非阻塞锁
-            try:
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-            except:
-                is_single_instance = False
-        else:
-            # Unix/Linux/Mac平台实现
-            import fcntl
-            lock_file = open(lock_file_path, 'w')
-            # 使用非阻塞锁
-            try:
-                fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except:
-                is_single_instance = False
+        # Windows平台实现
+        import msvcrt
+        lock_file = open(lock_file_path, 'w')
+        # 使用非阻塞锁
+        try:
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        except:
+            is_single_instance = False
         
         # 确保程序退出时释放锁文件
         def release_lock():
             try:
                 if lock_file:
-                    if sys.platform.startswith('win'):
-                        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
                     lock_file.close()
                 if os.path.exists(lock_file_path):
                     os.remove(lock_file_path)
