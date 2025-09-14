@@ -6,9 +6,6 @@ import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, simpledialog
 
-# 项目版本信息
-VERSION = "V2.0"
-
 # 尝试导入packaging.version，如果不可用则使用自定义的版本比较函数
 try:
     from packaging.version import parse as parse_version
@@ -28,6 +25,14 @@ PYPI_MIRRORS = {
     '豆瓣': 'https://pypi.douban.com/simple/',
     '华为云': 'https://mirrors.huaweicloud.com/repository/pypi/simple/'
 }
+
+# 配置项类 - 将分散的配置集中管理
+class Config:
+    VERSION = "V2.0"
+    LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
+    MAX_THREAD_WORKERS = 4  # 最大线程数量
+    DEFAULT_TIMEOUT = 15  # 默认超时时间(秒)
+    MAX_HISTORY_ITEMS = 20  # 库名称历史记录最大数量
 
 # 判断是否为Windows平台，并且不是在交互式Python环境中运行
 if sys.platform.startswith('win') and not hasattr(sys, 'ps1'):
@@ -90,10 +95,33 @@ class EnvironmentCheckerApp:
         # 如果没有找到，返回None
         return None
         
+    def _get_subprocess_kwargs(self, timeout=None, capture_output=False, pipe_stdout=False):
+        """获取子进程运行参数，自动处理Windows平台隐藏控制台窗口"""
+        kwargs = {
+            'text': True,
+        }
+        
+        if timeout is not None:
+            kwargs['timeout'] = timeout
+        
+        if capture_output:
+            kwargs['capture_output'] = True
+            kwargs['check'] = False
+        elif pipe_stdout:
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.STDOUT
+            kwargs['bufsize'] = 1
+        
+        # Windows平台添加creationflags参数隐藏控制台窗口
+        if os.name == 'nt':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        
+        return kwargs
+        
     def __init__(self, root):
         self.root = root
-        self.root.title(f"ComfyUI中Python环境维护小工具 {VERSION} 练老师 QQ群: 723799422")
-        self.root.geometry("1200x700")
+        self.root.title(f"ComfyUI中Python环境维护小工具 {Config.VERSION} 练老师 QQ群: 723799422")
+        self.root.geometry("1200x750")
         self.root.minsize(900, 700)
         
         # 设置窗口图标
@@ -168,17 +196,17 @@ class EnvironmentCheckerApp:
         paned_window.pack(fill=tk.BOTH, expand=True, pady=5)
         
         # 创建左侧面板 - 包含配置和操作功能
-        left_frame = ttk.LabelFrame(paned_window, text="配置与操作", padding="10")
+        left_frame = ttk.LabelFrame(paned_window, text="配置与操作", padding="12")
         paned_window.add(left_frame, weight=1)
         
         # 创建右侧面板 - 包含结果显示
-        right_frame = ttk.LabelFrame(paned_window, text="结果显示", padding="10")
+        right_frame = ttk.LabelFrame(paned_window, text="结果显示", padding="12")
         paned_window.add(right_frame, weight=2)
         
         # === 左侧面板内容 ===
 
         # 镜像源选择区域 - 移至窗口第一行，调整为与其他子界面一致的grid布局
-        mirror_frame = ttk.LabelFrame(left_frame, text="PyPI镜像源", padding="10")
+        mirror_frame = ttk.LabelFrame(left_frame, text="PyPI镜像源", padding="12")
         mirror_frame.pack(fill=tk.X, pady=5)
         
         # 创建标签和下拉框容器
@@ -198,7 +226,7 @@ class EnvironmentCheckerApp:
         test_mirror_btn = ttk.Button(mirror_frame, text="测试镜像源", command=self.test_mirror_speed, width=12)
         test_mirror_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
 
-        file_frame = ttk.LabelFrame(left_frame, text="插件节点依赖文件", padding="10")
+        file_frame = ttk.LabelFrame(left_frame, text="插件节点依赖文件", padding="12")
         file_frame.pack(fill=tk.X, pady=5)
         
         # 创建标签容器
@@ -215,7 +243,7 @@ class EnvironmentCheckerApp:
         select_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
         
         # Python环境选择区域 - 调整为pack布局
-        env_frame = ttk.LabelFrame(left_frame, text="电脑当前Python环境", padding="10")
+        env_frame = ttk.LabelFrame(left_frame, text="当前Python环境", padding="12")
         env_frame.pack(fill=tk.X, pady=5)
         
         # 创建标签容器
@@ -238,7 +266,7 @@ class EnvironmentCheckerApp:
         env_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
         
         # 中间按钮区域 - 改为与第三方库相同的水平布局
-        btn_frame = ttk.LabelFrame(left_frame, text="ComfyUI环境操作按钮", padding="10")
+        btn_frame = ttk.LabelFrame(left_frame, text="ComfyUI环境操作按钮", padding="12")
         btn_frame.pack(fill=tk.X, pady=8)
 
         # 创建按钮容器，使用pack布局水平排列
@@ -282,7 +310,7 @@ class EnvironmentCheckerApp:
         clear_btn.pack(side=tk.LEFT, padx=8, pady=2)
 
         # 第三方库管理区域 - 优化布局
-        lib_frame = ttk.LabelFrame(left_frame, text="第三方库管理", padding="10")
+        lib_frame = ttk.LabelFrame(left_frame, text="第三方库管理", padding="12")
         lib_frame.pack(fill=tk.X, pady=8)
         
         # 库名称和版本输入区域
@@ -551,15 +579,10 @@ class EnvironmentCheckerApp:
             return None
             
         try:
-            # 使用指定的Python环境的pip show命令获取包信息，隐藏控制台窗口
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            # Windows平台添加creationflags参数隐藏控制台窗口
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
+            
+            # 使用指定的Python环境的pip show命令获取包信息
             
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'show', package_name],
@@ -703,16 +726,8 @@ class EnvironmentCheckerApp:
                 cmd.append(mirror_url.split('/')[2])  # 添加trusted-host参数
                 self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
             
-            # 设置子进程参数
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.STDOUT,
-                'text': True,
-                'bufsize': 1
-            }
-            # Windows平台添加creationflags参数隐藏控制台窗口
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT, pipe_stdout=True)
             
             process = subprocess.Popen(cmd, **kwargs)
             
@@ -880,7 +895,7 @@ class EnvironmentCheckerApp:
             if shutil.which(python_exe) or os.path.isfile(python_exe) and os.access(python_exe, os.X_OK):
                 self.python_exe_path = python_exe
                 self.python_env_path = os.path.dirname(python_exe)
-                self.env_label.config(text=f"当前Python环境: {self.python_exe_path}")
+                self.env_label.config(text=f"{self.python_exe_path}")
                 self.update_result_text(f"已切换到Python环境: {self.python_exe_path}\n\n")
                 
                 # 重置检查结果和安装按钮状态
@@ -898,19 +913,13 @@ class EnvironmentCheckerApp:
             )
             
             if env_dir:
-                # 尝试在选择的目录中找到Python可执行文件
-                if os.name == 'nt':  # Windows系统
-                    python_exe_candidates = [
-                        os.path.join(env_dir, 'python.exe'),
-                        os.path.join(env_dir, 'Scripts', 'python.exe'),
-                        os.path.join(env_dir, 'bin', 'python.exe')
+                # 尝试在选择的目录中找到Python可执行文件      
+                python_exe_candidates = [
+                    os.path.join(env_dir, 'python.exe'),
+                    os.path.join(env_dir, 'Scripts', 'python.exe'),
+                    os.path.join(env_dir, 'bin', 'python.exe')
                     ]
-                else:  # Unix/Linux系统
-                    python_exe_candidates = [
-                        os.path.join(env_dir, 'bin', 'python'),
-                        os.path.join(env_dir, 'bin', 'python3')
-                    ]
-                
+                                
                 python_exe = None
                 for candidate in python_exe_candidates:
                     if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
@@ -920,7 +929,7 @@ class EnvironmentCheckerApp:
                 if python_exe:
                     self.python_exe_path = python_exe
                     self.python_env_path = env_dir
-                    self.env_label.config(text=f"当前Python环境: {self.python_exe_path}")
+                    self.env_label.config(text=f"{self.python_exe_path}")
                     self.update_result_text(f"已切换到Python环境: {self.python_exe_path}\n\n")
                     
                     # 重置检查结果和安装按钮状态
@@ -995,16 +1004,8 @@ class EnvironmentCheckerApp:
                 cmd.append(mirror_url.split('/')[2])  # 添加trusted-host参数
                 self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
             
-            # 设置子进程参数
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.STDOUT,
-                'text': True,
-                'bufsize': 1
-            }
-            # Windows平台添加creationflags参数隐藏控制台窗口
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT, pipe_stdout=True)
             
             process = subprocess.Popen(cmd, **kwargs)
             
@@ -1078,13 +1079,8 @@ class EnvironmentCheckerApp:
     def _check_pip_check_available(self):
         """检查pip check命令是否可用"""
         try:
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             # 运行pip check --help命令来测试是否可用
             result = subprocess.run(
@@ -1101,13 +1097,7 @@ class EnvironmentCheckerApp:
         """安装pip check所需的包（实际上pip check是pip自带的功能，但有些版本可能需要更新pip）"""
         try:
             self.update_result_text("正在检查并安装pip check所需的组件...\n")
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             # 更新pip到最新版本
             result = subprocess.run(
@@ -1192,13 +1182,7 @@ class EnvironmentCheckerApp:
     def _run_pip_check(self):
         """运行pip check命令并解析结果，提供结构化的冲突信息"""
         try:
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             self.update_result_text("正在执行pip check命令...\n")
             result = subprocess.run(
@@ -1259,14 +1243,7 @@ class EnvironmentCheckerApp:
         """获取当前Python环境中所有已安装的包"""
         try:
             # 使用pip list命令获取已安装包
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            # Windows平台添加creationflags参数隐藏控制台窗口
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'list', '--format=columns'],
@@ -1289,13 +1266,7 @@ class EnvironmentCheckerApp:
     def _get_all_installed_packages_with_versions(self):
         """一次性获取所有已安装包及其版本信息（性能优化）"""
         try:
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': False
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             # 尝试使用JSON格式获取包信息，这比多次调用pip show要快得多
             try:
@@ -1699,12 +1670,7 @@ class EnvironmentCheckerApp:
         """检查当前环境是否已安装指定库"""
         try:
             # 使用pip show命令检查库是否已安装
-            kwargs = {
-                'capture_output': True,
-                'text': True
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'show', lib_name],
@@ -1729,12 +1695,7 @@ class EnvironmentCheckerApp:
         """获取指定库的可用版本列表"""
         try:
             # 使用pip index versions命令获取版本列表（需要pip 21.2+）
-            kwargs = {
-                'capture_output': True,
-                'text': True
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
             
             # 构建命令
             command = [self.python_exe_path, '-m', 'pip', 'index', 'versions', lib_name]
@@ -1869,14 +1830,10 @@ class EnvironmentCheckerApp:
                 command.append('--trusted-host')
                 command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
             
-            # 执行命令
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
-                'text': True
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT)
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
             
             process = subprocess.Popen(command, **kwargs)
             
@@ -1936,14 +1893,10 @@ class EnvironmentCheckerApp:
             # 构建pip uninstall命令
             command = [self.python_exe_path, '-m', 'pip', 'uninstall', lib_name, '-y']
             
-            # 执行命令
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
-                'text': True
-            }
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            # 使用辅助方法获取子进程参数
+            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT)
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
             
             process = subprocess.Popen(command, **kwargs)
             
@@ -1995,6 +1948,9 @@ class EnvironmentCheckerApp:
         # 避免重复添加
         if lib_name and lib_name not in self.lib_history:
             self.lib_history.append(lib_name)
+            # 限制历史记录的最大数量
+            if len(self.lib_history) > Config.MAX_HISTORY_ITEMS:
+                self.lib_history = self.lib_history[-Config.MAX_HISTORY_ITEMS:]
             # 更新下拉框的值列表
             self.lib_name_combobox['values'] = self.lib_history
         
@@ -2046,7 +2002,7 @@ class EnvironmentCheckerApp:
                     'stdout': subprocess.PIPE,
                     'stderr': subprocess.STDOUT,
                     'text': True,
-                    'timeout': 15  # 增加超时时间到15秒
+                    'timeout': Config.DEFAULT_TIMEOUT  # 使用配置的超时时间
                 }
                 
                 if os.name == 'nt':
@@ -2069,7 +2025,7 @@ class EnvironmentCheckerApp:
                         self.update_result_text(f"错误摘要: {error_summary}\n")
                     self.update_result_text("\n")
             except subprocess.TimeoutExpired:
-                self.update_result_text(f"{mirror_name} 测试超时（>15秒）\n\n")
+                self.update_result_text(f"{mirror_name} 测试超时（>{Config.DEFAULT_TIMEOUT}秒）\n\n")
             except Exception as e:
                 self.update_result_text(f"{mirror_name} 测试出错: {str(e)}\n\n")
         
@@ -2129,12 +2085,11 @@ if __name__ == "__main__":
     # 单例实现 - 仅Windows平台
     is_single_instance = True
     lock_file = None
-    lock_file_path = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     
     try:
         # Windows平台实现
         import msvcrt
-        lock_file = open(lock_file_path, 'w')
+        lock_file = open(Config.LOCK_FILE_PATH, 'w')
         # 使用非阻塞锁
         try:
             msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
@@ -2147,8 +2102,8 @@ if __name__ == "__main__":
                 if lock_file:
                     msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
                     lock_file.close()
-                if os.path.exists(lock_file_path):
-                    os.remove(lock_file_path)
+                if os.path.exists(Config.LOCK_FILE_PATH):
+                    os.remove(Config.LOCK_FILE_PATH)
             except:
                 pass
         
