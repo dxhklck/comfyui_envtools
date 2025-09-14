@@ -28,7 +28,7 @@ PYPI_MIRRORS = {
 
 # 配置项类 - 将分散的配置集中管理
 class Config:
-    VERSION = "V2.0"
+    VERSION = "V2.1"
     LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     MAX_THREAD_WORKERS = 4  # 最大线程数量
     DEFAULT_TIMEOUT = 15  # 默认超时时间(秒)
@@ -96,13 +96,12 @@ class EnvironmentCheckerApp:
         return None
         
     def _get_subprocess_kwargs(self, timeout=None, capture_output=False, pipe_stdout=False):
-        """获取子进程运行参数，自动处理Windows平台隐藏控制台窗口"""
+        """获取用于subprocess.Popen的子进程运行参数，自动处理Windows平台隐藏控制台窗口
+           注意：timeout参数不会添加到返回的kwargs中，因为subprocess.Popen不支持该参数
+        """
         kwargs = {
             'text': True,
         }
-        
-        if timeout is not None:
-            kwargs['timeout'] = timeout
         
         if capture_output:
             kwargs['capture_output'] = True
@@ -118,11 +117,19 @@ class EnvironmentCheckerApp:
         
         return kwargs
         
+    def _get_run_subprocess_kwargs(self, timeout=Config.DEFAULT_TIMEOUT, capture_output=False, check=False):
+        """获取用于subprocess.run的子进程运行参数，包含timeout和check参数"""
+        kwargs = self._get_subprocess_kwargs(capture_output=capture_output)
+        if timeout is not None:
+            kwargs['timeout'] = timeout
+        kwargs['check'] = check
+        return kwargs
+        
     def __init__(self, root):
         self.root = root
         self.root.title(f"ComfyUI中Python环境维护小工具 {Config.VERSION} 练老师 QQ群: 723799422")
-        self.root.geometry("1200x750")
-        self.root.minsize(900, 700)
+        self.root.geometry("1200x700")
+        self.root.minsize(900, 650)
         
         # 设置窗口图标
         try:
@@ -727,7 +734,7 @@ class EnvironmentCheckerApp:
                 self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
             
             # 使用辅助方法获取子进程参数
-            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT, pipe_stdout=True)
+            kwargs = self._get_subprocess_kwargs(pipe_stdout=True)
             
             process = subprocess.Popen(cmd, **kwargs)
             
@@ -785,14 +792,7 @@ class EnvironmentCheckerApp:
         """获取当前Python环境已安装的包"""
         try:
             # 使用指定的Python环境的pip list命令获取已安装的包，隐藏控制台窗口
-            kwargs = {
-                'capture_output': True,
-                'text': True,
-                'check': True
-            }
-            # Windows平台添加creationflags参数隐藏控制台窗口
-            if os.name == 'nt':
-                kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+            kwargs = self._get_run_subprocess_kwargs(capture_output=True, check=True, timeout=Config.DEFAULT_TIMEOUT)
             
             result = subprocess.run(
                 [self.python_exe_path, '-m', 'pip', 'list', '--format=freeze'],
@@ -1005,7 +1005,7 @@ class EnvironmentCheckerApp:
                 self.update_result_text(f"使用镜像源: {self.selected_mirror} ({mirror_url})\n\n")
             
             # 使用辅助方法获取子进程参数
-            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT, pipe_stdout=True)
+            kwargs = self._get_subprocess_kwargs(pipe_stdout=True)
             
             process = subprocess.Popen(cmd, **kwargs)
             
@@ -1233,9 +1233,9 @@ class EnvironmentCheckerApp:
                     package_name = words[0]
                     
                 if package_name:
-                    return f"使用pipdeptree分析'{package_name}'的依赖关系: python -m pipdeptree --reverse --packages {package_name}\n根据树形结构分析结果确定冲突来源和解决方案"
+                    return f"使用 pipdeptree 分析'{package_name}'的依赖关系: python -m pipdeptree --reverse --packages {package_name}\n 根据结果,建议升级或降级相关包版本,达到平衡进行排错,如果一个太老,一个太新,就那只能取舍"
                 
-            return "使用pipdeptree分析依赖关系: python -m pipdeptree --reverse --packages 包名\n根据树形结构分析结果确定冲突来源和解决方案"
+            return "使用 pipdeptree 分析依赖关系: python -m pipdeptree --reverse --packages 包名\n根据树形结构分析结果确定冲突来源和解决方案"
         except:
             return None
   
@@ -1301,7 +1301,6 @@ class EnvironmentCheckerApp:
             return packages
         except Exception:
             return {}
-
         
     def compare_environment_files(self):
         """比较两个环境文件的差异"""
@@ -1609,18 +1608,35 @@ class EnvironmentCheckerApp:
         """在新线程中从本地环境模糊查找库"""
         try:
             # Windows系统专用实现
-            # 使用 pip list | findstr 命令查找匹配的库
-            cmd = f"{self.python_exe_path} -m pip list | findstr /I /C:{search_term}"
-            kwargs = {
-                'stdout': subprocess.PIPE,
-                'stderr': subprocess.PIPE,
-                'text': True,
-                'shell': True,
-                'creationflags': subprocess.CREATE_NO_WINDOW
-            }
+            # 使用安全的方式执行命令，不使用shell=True
+            # 1. 首先获取所有已安装的包列表
+            cmd_pip_list = [self.python_exe_path, '-m', 'pip', 'list', '--format=columns']
+            kwargs_pip_list = self._get_run_subprocess_kwargs(capture_output=True, timeout=Config.DEFAULT_TIMEOUT)
             
-            # 执行命令
-            result = subprocess.run(cmd, **kwargs)
+            # 执行pip list命令
+            result_pip_list = subprocess.run(cmd_pip_list, **kwargs_pip_list)
+            
+            # 2. 手动过滤结果以模拟findstr功能
+            if result_pip_list.returncode == 0:
+                # 模拟命令执行结果，设置stdout和returncode
+                class MockResult:
+                    def __init__(self, stdout, returncode):
+                        self.stdout = stdout
+                        self.returncode = returncode
+                        self.stderr = ''
+                
+                # 过滤包含搜索词的行
+                output_lines = result_pip_list.stdout.strip().split('\n')
+                filtered_lines = []
+                for line in output_lines:
+                    if search_term.lower() in line.lower():
+                        filtered_lines.append(line)
+                
+                # 创建模拟结果对象
+                filtered_stdout = '\n'.join(filtered_lines)
+                result = MockResult(filtered_stdout, 0 if filtered_lines else 1)
+            else:
+                result = result_pip_list
             
             # 处理结果
             if result.returncode == 0:
@@ -1831,7 +1847,7 @@ class EnvironmentCheckerApp:
                 command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
             
             # 使用辅助方法获取子进程参数
-            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT)
+            kwargs = self._get_subprocess_kwargs()
             kwargs['stdout'] = subprocess.PIPE
             kwargs['stderr'] = subprocess.PIPE
             
@@ -1894,7 +1910,7 @@ class EnvironmentCheckerApp:
             command = [self.python_exe_path, '-m', 'pip', 'uninstall', lib_name, '-y']
             
             # 使用辅助方法获取子进程参数
-            kwargs = self._get_subprocess_kwargs(timeout=Config.DEFAULT_TIMEOUT)
+            kwargs = self._get_subprocess_kwargs()
             kwargs['stdout'] = subprocess.PIPE
             kwargs['stderr'] = subprocess.PIPE
             
@@ -1998,15 +2014,12 @@ class EnvironmentCheckerApp:
                     host = mirror_url.split('/')[2]  # 获取主机名
                     cmd.extend(['--trusted-host', host])
                 
-                kwargs = {
-                    'stdout': subprocess.PIPE,
-                    'stderr': subprocess.STDOUT,
-                    'text': True,
-                    'timeout': Config.DEFAULT_TIMEOUT  # 使用配置的超时时间
-                }
-                
-                if os.name == 'nt':
-                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+                # 使用专门用于subprocess.run的辅助方法，包含timeout支持
+                kwargs = self._get_run_subprocess_kwargs(capture_output=True, timeout=Config.DEFAULT_TIMEOUT)
+                # 自定义stdout和stderr处理
+                kwargs['stdout'] = subprocess.PIPE
+                kwargs['stderr'] = subprocess.STDOUT
+                kwargs.pop('capture_output', None)  # 移除capture_output，因为我们明确设置了stdout和stderr
                 
                 result = subprocess.run(cmd, **kwargs)
                 
