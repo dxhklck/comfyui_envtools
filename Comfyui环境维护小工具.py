@@ -1,6 +1,7 @@
 # 导入必要的模块
 import sys
 import os
+import json
 import tempfile
 import time
 import tkinter as tk
@@ -28,7 +29,7 @@ PYPI_MIRRORS = {
 
 # 配置项类 - 将分散的配置集中管理
 class Config:
-    VERSION = "V2.1"
+    VERSION = "V2.2"
     LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     MAX_THREAD_WORKERS = 4  # 最大线程数量
     DEFAULT_TIMEOUT = 15  # 默认超时时间(秒)
@@ -148,6 +149,7 @@ class EnvironmentCheckerApp:
         screen_height = self.root.winfo_screenheight()
         x = (screen_width - width) // 2
         y = (screen_height - height) // 2
+        
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         
         # 设置中文字体支持 - 优化字体大小
@@ -161,22 +163,13 @@ class EnvironmentCheckerApp:
             font=("SimHei", 11)
         )
         
-        # 检测系统PATH变量中的Python环境
-        system_python = self.find_python_in_path()
-        
         # 初始化所有必要的属性
         # 存储requirements.txt路径
         self.requirements_path = ""
         # 存储Python环境路径
         self.python_env_path = ""
         # 存储Python可执行文件路径
-        if system_python:
-            self.python_exe_path = system_python
-            self.python_env_path = os.path.dirname(system_python)
-        else:
-            # 如果PATH中没有Python环境，设置为未选择状态
-            self.python_exe_path = ""
-            self.python_env_path = ""
+        self.python_exe_path = ""
         # 存储依赖包列表
         self.dependencies = []
         # 存储检查结果
@@ -189,9 +182,49 @@ class EnvironmentCheckerApp:
         self.selected_mirror = "官方源"
         # 进度条变量
         self.progress_var = tk.DoubleVar()
+        # Python环境路径列表
+        self.python_paths = []
+        # Python环境JSON文件路径
+        self.python_addr_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'python_addr.json')
+        
+        # 初始化Python环境列表
+        self._init_python_environments()
         
         # 创建界面（在所有属性初始化后）
         self.create_widgets()
+    
+    def _init_python_environments(self):
+        """初始化Python环境列表，仅从文件读取"""
+        # 如果文件存在，读取已保存的Python环境路径
+        if os.path.exists(self.python_addr_file):
+            try:
+                with open(self.python_addr_file, 'r', encoding='utf-8') as f:
+                    self.python_paths = json.load(f)
+            except Exception as e:
+                print(f"读取python_addr.json文件失败: {e}")
+                self.python_paths = []
+        else:
+            # 文件不存在时，初始化空列表
+            self.python_paths = []
+        
+        # 如果有保存的环境，设置默认Python环境
+        if self.python_paths:
+            self.python_exe_path = self.python_paths[0]
+            self.python_env_path = os.path.dirname(self.python_exe_path)
+        else:
+            # 没有保存的环境时，设置为空
+            self.python_exe_path = ""
+            self.python_env_path = ""
+    
+
+    
+    def _save_python_environments(self):
+        """保存Python环境列表到文件"""
+        try:
+            with open(self.python_addr_file, 'w', encoding='utf-8') as f:
+                json.dump(self.python_paths, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存python_addr.json文件失败: {e}")
         
     def create_widgets(self):
         # 创建主框架
@@ -249,7 +282,7 @@ class EnvironmentCheckerApp:
         select_btn = ttk.Button(file_frame, text="选择文件", command=self.select_requirements_file, width=12)
         select_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
         
-        # Python环境选择区域 - 调整为pack布局
+        # Python环境选择区域 - 调整为下拉列表
         env_frame = ttk.LabelFrame(left_frame, text="当前Python环境", padding="12")
         env_frame.pack(fill=tk.X, pady=5)
         
@@ -260,17 +293,25 @@ class EnvironmentCheckerApp:
         env_label = ttk.Label(env_label_container, text="当前环境:", width=10)
         env_label.pack(side=tk.LEFT, padx=(5, 0))
 
-        # 根据是否在PATH中找到Python环境显示不同的文本
-        if self.python_exe_path:
-            env_text = f"{self.python_exe_path}"
-        else:
-            env_text = "未选择"
-            
-        self.env_label = ttk.Label(env_label_container, text=env_text, anchor=tk.W)
-        self.env_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        # 创建Python环境下拉列表
+        self.python_env_var = tk.StringVar(value="" if not self.python_exe_path else self.python_exe_path)
+        self.python_env_combobox = ttk.Combobox(
+            env_label_container, 
+            textvariable=self.python_env_var, 
+            values=self.python_paths,
+            state="readonly", 
+            width=50
+        )
+        self.python_env_combobox.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        self.python_env_combobox.bind("<<ComboboxSelected>>", self.on_python_env_change)
 
-        env_btn = ttk.Button(env_frame, text="选择环境", command=self.select_python_environment, width=12)
-        env_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
+        # 添加按钮用于选择新的Python环境
+        add_env_btn = ttk.Button(env_frame, text="添加环境", command=self.select_python_environment, width=12)
+        add_env_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
+        
+        # 添加按钮用于删除选择的Python环境
+        delete_env_btn = ttk.Button(env_frame, text="删除环境", command=self.delete_python_environment, width=12)
+        delete_env_btn.pack(side=tk.LEFT, padx=(5, 5), pady=5)
         
         # 中间按钮区域 - 改为与第三方库相同的水平布局
         btn_frame = ttk.LabelFrame(left_frame, text="ComfyUI环境操作按钮", padding="12")
@@ -881,22 +922,90 @@ class EnvironmentCheckerApp:
                         # 在主线程中显示错误消息
                         self.root.after(0, lambda: messagebox.showerror("错误", f"保存文件失败: {str(e)}"))
     
+    def on_python_env_change(self, event):
+        """处理Python环境下拉列表选择变更"""
+        selected_python = self.python_env_var.get()
+        if selected_python and selected_python != "未选择":
+            # 验证选择的是否为有效的Python可执行文件
+            if os.path.isfile(selected_python) and os.access(selected_python, os.X_OK):
+                self.python_exe_path = selected_python
+                self.python_env_path = os.path.dirname(selected_python)
+                self.update_result_text(f"已切换到Python环境: {self.python_exe_path}\n\n")
+                
+                # 重置检查结果和安装按钮状态
+                self.check_results = {}
+                self.install_btn.config(state=tk.NORMAL)
+                self.has_conflicts = True
+            else:
+                # 在主线程中显示错误消息
+                self.root.after(0, lambda: messagebox.showerror("错误", f"选择的文件不是有效的Python可执行文件: {selected_python}"))
+    
+    def delete_python_environment(self):
+        """删除选择的Python环境"""
+        selected_python = self.python_env_var.get()
+        
+        if selected_python and selected_python != "" and selected_python in self.python_paths:
+            # 显示确认对话框
+            confirmed = messagebox.askyesno(
+                "确认删除", 
+                f"确定要删除Python环境: {selected_python}吗？\n此操作不可撤销。"
+            )
+            
+            if confirmed:
+                # 从列表中删除
+                self.python_paths.remove(selected_python)
+                
+                # 如果删除的是当前使用的环境，重置相关属性
+                if selected_python == self.python_exe_path:
+                    self.python_exe_path = ""
+                    self.python_env_path = ""
+                    self.check_results = {}
+                    self.has_conflicts = True
+                
+                # 无论是否删除的是当前环境，都更新下拉列表状态
+                # 当下拉列表为空时，设置值为空字符串
+                self.python_env_var.set("" if not self.python_paths else 
+                                       (self.python_paths[0] if selected_python == self.python_exe_path else self.python_env_var.get()))
+                
+                # 更新下拉列表的值列表
+                self.python_env_combobox['values'] = self.python_paths
+                
+                # 保存到文件
+                self._save_python_environments()
+                
+                # 显示删除成功消息
+                self.update_result_text(f"已删除Python环境: {selected_python}\n\n")
+        else:
+            # 没有选择环境或选择的环境不在列表中
+            messagebox.showinfo("提示", "请先选择要删除的Python环境")
+    
     def select_python_environment(self):
-        """选择Python环境目录"""
+        """添加新的Python环境"""
         # 先尝试让用户选择Python可执行文件
         python_exe = filedialog.askopenfilename(
             title="选择Python可执行文件",
             filetypes=[("Python可执行文件", "python.exe python3.exe"), ("所有文件", "*")],
-            initialdir=os.path.dirname(sys.executable)
+            initialdir=os.path.dirname(sys.executable) if self.python_exe_path else ""
         )
         
         if python_exe:
             # 验证选择的是否为有效的Python可执行文件
             if shutil.which(python_exe) or os.path.isfile(python_exe) and os.access(python_exe, os.X_OK):
+                # 检查是否已经存在于列表中
+                if python_exe not in self.python_paths:
+                    # 添加到Python环境列表
+                    self.python_paths.append(python_exe)
+                    # 保存到文件
+                    self._save_python_environments()
+                    # 更新下拉列表
+                    self.python_env_combobox['values'] = self.python_paths
+                    # 选择新添加的环境
+                    self.python_env_var.set(python_exe)
+                
+                # 设置当前环境
                 self.python_exe_path = python_exe
                 self.python_env_path = os.path.dirname(python_exe)
-                self.env_label.config(text=f"{self.python_exe_path}")
-                self.update_result_text(f"已切换到Python环境: {self.python_exe_path}\n\n")
+                self.update_result_text(f"已添加并切换到Python环境: {self.python_exe_path}\n\n")
                 
                 # 重置检查结果和安装按钮状态
                 self.check_results = {}
@@ -909,7 +1018,7 @@ class EnvironmentCheckerApp:
             # 如果用户取消选择可执行文件，尝试让用户选择环境目录
             env_dir = filedialog.askdirectory(
                 title="选择Python环境目录",
-                initialdir=os.path.dirname(os.path.dirname(sys.executable))
+                initialdir=os.path.dirname(os.path.dirname(self.python_exe_path)) if self.python_exe_path else ""
             )
             
             if env_dir:
@@ -918,8 +1027,8 @@ class EnvironmentCheckerApp:
                     os.path.join(env_dir, 'python.exe'),
                     os.path.join(env_dir, 'Scripts', 'python.exe'),
                     os.path.join(env_dir, 'bin', 'python.exe')
-                    ]
-                                
+                ]
+                                    
                 python_exe = None
                 for candidate in python_exe_candidates:
                     if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
@@ -927,10 +1036,21 @@ class EnvironmentCheckerApp:
                         break
                 
                 if python_exe:
+                    # 检查是否已经存在于列表中
+                    if python_exe not in self.python_paths:
+                        # 添加到Python环境列表
+                        self.python_paths.append(python_exe)
+                        # 保存到文件
+                        self._save_python_environments()
+                        # 更新下拉列表
+                        self.python_env_combobox['values'] = self.python_paths
+                        # 选择新添加的环境
+                        self.python_env_var.set(python_exe)
+                    
+                    # 设置当前环境
                     self.python_exe_path = python_exe
                     self.python_env_path = env_dir
-                    self.env_label.config(text=f"{self.python_exe_path}")
-                    self.update_result_text(f"已切换到Python环境: {self.python_exe_path}\n\n")
+                    self.update_result_text(f"已添加并切换到Python环境: {self.python_exe_path}\n\n")
                     
                     # 重置检查结果和安装按钮状态
                     self.check_results = {}
