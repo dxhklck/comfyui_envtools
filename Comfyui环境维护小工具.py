@@ -184,8 +184,8 @@ class EnvironmentCheckerApp:
         self.progress_var = tk.DoubleVar()
         # Python环境路径列表
         self.python_paths = []
-        # Python环境JSON文件路径
-        self.python_addr_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'python_addr.json')
+        # Python环境JSON文件路径 - 使用当前工作目录，确保打包成exe后能在运行目录生成文件
+        self.python_addr_file = os.path.join(os.getcwd(), 'python_addr.json')
         
         # 初始化Python环境列表
         self._init_python_environments()
