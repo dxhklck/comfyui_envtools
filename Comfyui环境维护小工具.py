@@ -29,10 +29,10 @@ PYPI_MIRRORS = {
 
 # 配置项类 - 将分散的配置集中管理
 class Config:
-    VERSION = "V2.2"
+    VERSION = "V2.3"
     LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     MAX_THREAD_WORKERS = 4  # 最大线程数量
-    DEFAULT_TIMEOUT = 15  # 默认超时时间(秒)
+    DEFAULT_TIMEOUT = 30  # 默认超时时间(秒)
     MAX_HISTORY_ITEMS = 20  # 库名称历史记录最大数量
 
 # 判断是否为Windows平台，并且不是在交互式Python环境中运行
@@ -129,8 +129,8 @@ class EnvironmentCheckerApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"ComfyUI中Python环境维护小工具 {Config.VERSION} 练老师 QQ群: 723799422")
-        self.root.geometry("1200x700")
-        self.root.minsize(900, 650)
+        self.root.geometry("1200x770")
+        self.root.minsize(1000, 760)
         
         # 设置窗口图标
         try:
@@ -215,9 +215,7 @@ class EnvironmentCheckerApp:
             # 没有保存的环境时，设置为空
             self.python_exe_path = ""
             self.python_env_path = ""
-    
-
-    
+      
     def _save_python_environments(self):
         """保存Python环境列表到文件"""
         try:
@@ -387,22 +385,55 @@ class EnvironmentCheckerApp:
         
         # 功能按钮区域 - 优化按钮间距和大小
         lib_btn_frame = ttk.Frame(lib_frame)
-        lib_btn_frame.pack(fill=tk.X, pady=5)
+        lib_btn_frame.pack(fill=tk.X, pady=2)
         
         # 计算按钮宽度以适应窗口宽度
-        btn_width = 10
+        btn_width = 8
         
         search_lib_btn = ttk.Button(lib_btn_frame, text="精确查找", command=self.search_library_exact, width=btn_width)
-        search_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
+        search_lib_btn.pack(side=tk.LEFT, padx=5, pady=2)
               
         search_lib_fuzzy_btn = ttk.Button(lib_btn_frame, text="模糊查找", command=self.search_library_local, width=btn_width)
-        search_lib_fuzzy_btn.pack(side=tk.LEFT, padx=10, pady=2)
+        search_lib_fuzzy_btn.pack(side=tk.LEFT, padx=5, pady=2)
               
         install_lib_btn = ttk.Button(lib_btn_frame, text="安装库", command=self.install_library, width=btn_width)
-        install_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
+        install_lib_btn.pack(side=tk.LEFT, padx=5, pady=2)
         
         uninstall_lib_btn = ttk.Button(lib_btn_frame, text="删除库", command=self.uninstall_library, width=btn_width)
-        uninstall_lib_btn.pack(side=tk.LEFT, padx=10, pady=2)
+        uninstall_lib_btn.pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # 添加轮子安装和编译安装按钮
+        install_whl_btn = ttk.Button(lib_btn_frame, text="轮子安装", command=self.install_whl_file, width=btn_width)
+        install_whl_btn.pack(side=tk.LEFT, padx=5, pady=2)
+        
+        install_source_btn = ttk.Button(lib_btn_frame, text="编译安装", command=self.install_source_code, width=btn_width)
+        install_source_btn.pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # 命令执行区域 - 在第三方库管理下方添加命令执行文本框
+        cmd_frame = ttk.LabelFrame(left_frame, text="python -m pip install 命令的相关参数", padding="12")
+        cmd_frame.pack(fill=tk.X, pady=8)
+        
+        # 命令输入区域
+        cmd_input_frame = ttk.Frame(cmd_frame)
+        cmd_input_frame.pack(fill=tk.X, pady=5)
+        
+        # 命令输入标签
+        cmd_label = ttk.Label(cmd_input_frame, text="CMD:", width=4)
+        cmd_label.pack(side=tk.LEFT, padx=(0, 5), fill=tk.Y, expand=True)
+        
+        # 命令输入文本框
+        self.cmd_var = tk.StringVar()
+        self.cmd_entry = ttk.Entry(cmd_input_frame, textvariable=self.cmd_var, width=46)
+        self.cmd_entry.pack(side=tk.LEFT, padx=0, fill=tk.X, expand=True)
+        self.cmd_entry.bind('<Return>', lambda event: self.execute_command())
+        
+        # 执行命令按钮
+        execute_btn = ttk.Button(cmd_input_frame, text="执行", command=self.execute_command, width=5)
+        execute_btn.pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # 显示pip参数说明按钮
+        param_btn = ttk.Button(cmd_input_frame, text="参数说明", command=self.show_pip_params, width=8)
+        param_btn.pack(side=tk.LEFT, padx=5, pady=2)
 
         # === 右侧面板内容 ===
         
@@ -449,9 +480,9 @@ class EnvironmentCheckerApp:
         self.progress_bar.pack_forget()  # 初始隐藏
         
     def select_requirements_file(self):
-        """选择requirements.txt文件"""
+        """选择requirements.txt文件并显示其内容"""
         file_path = filedialog.askopenfilename(
-            title="选择requirements.txt文件",
+            title="选择插件节点依赖文件",
             filetypes=[("文本文件", "*.txt"), ("所有文件", "*")]
         )
         
@@ -459,13 +490,29 @@ class EnvironmentCheckerApp:
             self.requirements_path = file_path
             self.file_label.config(text=f"{file_path}")
             
-            # 解析requirements.txt
+            # 显示文件原始内容
             try:
+                # 清空当前文本框内容
+                self.clear_results()
+                
+                # 显示文件路径信息
+                self.update_result_text(f"插件节点依赖文件: {os.path.basename(file_path)}\n")
+                self.update_result_text(f"路径: {file_path}\n")
+                self.update_result_text("="*60 + "\n\n")
+                
+                # 读取并显示文件内容
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                self.update_result_text(file_content)
+                
+                # 解析requirements.txt
                 self.parse_requirements_file()
-                self.update_result_text(f"成功解析requirements.txt文件，共找到 {len(self.dependencies)} 个依赖包。\n\n")
+                self.update_result_text(f"\n\n" + "="*60 + "\n")
+                self.update_result_text(f"成功解析依赖文件，共找到 {len(self.dependencies)} 个依赖包。\n")
+                
             except Exception as e:
                 # 在主线程中显示错误消息
-                self.root.after(0, lambda error=str(e): messagebox.showerror("错误", f"解析文件失败: {error}"))
+                self.root.after(0, lambda error=str(e): messagebox.showerror("错误", f"读取文件失败: {error}"))
             
             # 重置安装按钮状态
             self.install_btn.config(state=tk.NORMAL)
@@ -1166,8 +1213,121 @@ class EnvironmentCheckerApp:
             ))
 
     def clear_results(self):
-        """清空结果文本框"""
+        """清空右侧结果显示区域"""
         self.result_text.delete(1.0, tk.END)
+        
+    def show_pip_params(self):
+        """显示pip install命令的常用参数说明"""
+        # 清空结果区域
+        self.clear_results()
+        
+        # 显示参数说明
+        self.update_result_text("==== pip install 命令常用参数说明 ====\n\n")
+        self.update_result_text("以下是python -m pip install命令的一些常用参数及其含义：\n\n")
+        
+        params = [
+            ("--no-deps", "不安装包的依赖项", "示例：python.exe -m pip install package --no-deps\n当您想要安装特定包但不希望它自动安装其依赖包时使用。\n这在处理依赖冲突或特定版本控制时特别有用。\n\n"),
+            ("--upgrade", "升级已安装的包", "示例：python.exe -m pip install package --upgrade\n强制升级已安装的包到最新版本。\n\n"),
+            ("--force-reinstall", "强制重新安装包", "示例：python.exe -m pip install package --force-reinstall\n即使包已经安装，也会强制重新下载和安装。\n\n"),
+            ("--ignore-installed", "忽略已安装的包", "示例：python.exe -m pip install package --ignore-installed\n忽略已安装的包及其依赖项，直接覆盖安装。\n\n"),
+            ("--index-url", "指定包索引URL", "示例：python.exe -m pip install package --index-url=https://pypi.org/simple/\n指定从哪个包索引服务器下载包。常用于指定国内镜像源。\n\n"),
+            ("--trusted-host", "添加可信主机", "示例：python.exe -m pip install package --trusted-host=pypi.org\n将指定主机标记为可信，用于HTTPS连接。\n\n"),
+            ("--timeout", "设置超时时间(秒)", "示例：python.exe -m pip install package --timeout=120\n设置连接超时时间，默认为15秒。\n\n"),
+            ("-v/--verbose", "详细输出模式", "示例：python.exe -m pip install package -v\n显示更详细的安装信息，有助于调试问题。\n\n"),
+            ("--pre", "包含预发布版本", "示例：python.exe -m pip install package --pre\n允许安装预发布版本和开发版本。\n\n"),
+            ("package==version", "指定包版本", "示例：python.exe -m pip install package==1.2.3\n安装特定版本的包。\n\n"),
+            ("--user", "安装到用户目录", "示例：python.exe -m pip install package --user\n将包安装到用户主目录，无需管理员权限。\n适用于没有系统安装权限的情况。\n\n"),
+            ("-e/--editable", "以开发模式安装", "示例：python.exe -m pip install -e /path/to/package\n以可编辑模式安装包，修改源代码后无需重新安装。\n常用于开发过程中测试修改。\n\n"),
+            ("-r/--requirement", "从需求文件安装", "示例：python.exe -m pip install -r requirements.txt\n从指定的需求文件中批量安装多个包及其版本。\n\n"),
+            ("--no-cache-dir", "不使用缓存目录", "示例：python.exe -m pip install package --no-cache-dir\n禁用pip的缓存功能，强制重新下载包。\n适用于需要获取最新包的情况。\n\n"),
+            ("--dry-run", "模拟安装但不实际安装", "示例：python.exe -m pip install package --dry-run\n仅显示安装过程但不实际执行安装操作。\n常用于检查安装计划。\n\n"),
+        ]
+        
+        for param, desc, example in params:
+            self.update_result_text(f"参数: {param}\n")
+            self.update_result_text(f"描述: {desc}\n")
+            self.update_result_text(f"{example}")
+        
+        self.update_result_text("="*50 + "\n")
+        self.update_result_text("提示：您可以在命令输入框中组合使用这些参数。\n")
+        self.update_result_text("例如：python.exe -m pip install -r requirements.txt --user --upgrade --index-url=https://pypi.tuna.tsinghua.edu.cn/simple/")
+    
+    def execute_command(self):
+        """执行用户输入的CMD命令"""
+        # 获取命令文本
+        command = self.cmd_var.get().strip()
+        
+        if not command:
+            messagebox.showwarning("警告", "请输入要执行的命令")
+            return
+        
+        # 显示进度条
+        self.progress_bar.pack(fill=tk.X, pady=5)
+        self.progress_var.set(20)  # 设置初始进度
+        
+        # 在新线程中执行命令
+        cmd_thread = Thread(target=self._execute_command_thread, args=(command,))
+        cmd_thread.daemon = True
+        cmd_thread.start()
+    
+    def _execute_command_thread(self, command):
+        """在新线程中执行命令"""
+        try:
+            self.update_result_text(f"执行命令: {command}\n\n")
+            
+            # 获取子进程参数，使用shell=True来支持完整的CMD命令
+            kwargs = self._get_subprocess_kwargs()
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
+            kwargs['shell'] = True  # 允许执行完整的CMD命令
+            kwargs['encoding'] = 'utf-8'  # 明确指定编码
+            kwargs['errors'] = 'replace'  # 替换无法解码的字符
+            
+            # 设置命令执行的工作目录为所选Python环境目录
+            if self.python_env_path and os.path.isdir(self.python_env_path):
+                kwargs['cwd'] = self.python_env_path
+                self.update_result_text(f"命令执行目录: {self.python_env_path}\n\n")
+            else:
+                self.update_result_text(f"未选择Python环境，使用当前工作目录: {os.getcwd()}\n\n")
+                
+            # 执行命令
+            process = subprocess.Popen(command, **kwargs)
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(40))
+            
+            # 使用communicate方法一次性读取所有输出，避免死锁
+            stdout, stderr = process.communicate()
+            
+            # 更新进度
+            self.root.after(0, lambda: self.progress_var.set(80))
+            
+            # 显示标准输出
+            if stdout:
+                self.update_result_text("【命令输出】\n")
+                self.update_result_text(stdout)
+                self.update_result_text("\n")
+            
+            # 显示标准错误
+            if stderr:
+                self.update_result_text("【错误输出】\n")
+                self.update_result_text(stderr)
+                self.update_result_text("\n")
+            
+            # 显示命令执行状态
+            self.update_result_text("="*60 + "\n")
+            if process.returncode == 0:
+                self.update_result_text(f"命令执行成功，返回代码: {process.returncode}\n")
+            else:
+                self.update_result_text(f"命令执行失败，返回代码: {process.returncode}\n")
+                self.root.after(0, lambda: messagebox.showerror("命令执行失败", f"命令 '{command}' 执行失败，返回代码: {process.returncode}\n请查看右侧输出窗口了解详细信息。"))
+        except Exception as e:
+            self.update_result_text(f"执行命令时出错: {str(e)}\n")
+            self.root.after(0, lambda error=str(e): messagebox.showerror("执行错误", f"执行命令时出错: {error}"))
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_var.set(100))
+            self.root.after(100, lambda: self.progress_bar.pack_forget())
     
     def copy_selected_text(self, event=None):
         """复制选中的文本到剪贴板"""
@@ -2020,6 +2180,365 @@ class EnvironmentCheckerApp:
         
         # 在新线程中执行删除
         uninstall_thread = Thread(target=self._uninstall_library_thread, args=(lib_name,))
+        uninstall_thread.daemon = True
+        uninstall_thread.start()
+
+    def install_whl_file(self):
+        """安装whl预编译文件"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 打开文件对话框让用户选择whl文件
+        whl_file = filedialog.askopenfilename(
+            title="选择whl预编译文件",
+            filetypes=[("Wheel文件", "*.whl"), ("所有文件", "*")]
+        )
+        
+        if whl_file:
+            # 显示进度条
+            self.progress_bar.pack(fill=tk.X, pady=5)
+            self.progress_var.set(0)
+            # 在新线程中执行安装
+            install_thread = Thread(target=self._install_whl_thread, args=(whl_file,))
+            install_thread.daemon = True
+            install_thread.start()
+    
+    def _install_whl_thread(self, whl_file):
+        """在新线程中安装whl文件"""
+        try:
+            # 构建pip install命令
+            command = [self.python_exe_path, '-m', 'pip', 'install', whl_file]
+            
+            # 添加镜像源参数
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                command.extend(['-i', mirror_url])
+                command.append('--trusted-host')
+                command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+            
+            # 使用辅助方法获取子进程参数，但明确设置编码以确保正确显示错误信息
+            kwargs = self._get_subprocess_kwargs()
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
+            kwargs['encoding'] = 'utf-8'  # 明确指定编码
+            kwargs['errors'] = 'replace'  # 替换无法解码的字符
+            
+            self.update_result_text(f"开始安装whl文件: {whl_file}\n\n")
+            
+            process = subprocess.Popen(command, **kwargs)
+            
+            # 使用communicate方法一次性读取所有输出，避免死锁
+            stdout, stderr = process.communicate()
+            
+            # 显示标准输出
+            if stdout:
+                self.update_result_text(stdout)
+            
+            # 显示标准错误（错误信息通常在这里）
+            if stderr:
+                self.update_result_text("\n【错误输出】\n")
+                self.update_result_text(stderr)
+            
+            if process.returncode == 0:
+                self.root.after(0, lambda: messagebox.showinfo("安装成功", f"whl文件 {os.path.basename(whl_file)} 安装成功!"))
+            else:
+                # 在错误提示中包含更详细的信息
+                error_msg = f"whl文件 {os.path.basename(whl_file)} 安装失败!\n\n" \
+                           f"请查看右侧输出窗口了解详细的错误信息。\n" \
+                           f"常见原因包括：编译环境缺失、依赖不满足、Python版本不兼容等。"
+                self.root.after(0, lambda: messagebox.showerror("安装失败", error_msg))
+        except Exception as e:
+            self.update_result_text(f"安装whl文件时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
+            
+    def install_source_code(self):
+        """从源代码目录编译安装Python库"""
+        # 检查是否选择了Python环境
+        if not self.python_exe_path:
+            messagebox.showwarning("警告", "未选择Python环境，请先选择一个有效的Python环境")
+            return
+            
+        # 检查编译环境
+        if not self._check_build_environment():
+            return
+            
+        # 打开文件夹对话框让用户选择源代码目录
+        source_dir = filedialog.askdirectory(
+            title="选择Python源代码目录"
+        )
+        
+        if source_dir:
+            # 在新线程中执行安装
+            install_thread = Thread(target=self._install_source_thread, args=(source_dir,))
+            install_thread.daemon = True
+            install_thread.start()
+            
+    def _check_build_environment(self):
+        """检查编译环境是否满足要求"""
+        missing_components = []
+        
+        # 检查Python构建库
+        missing_libraries = self._check_python_build_libraries()
+        if missing_libraries:
+            missing_components.extend([f"Python库: {lib}" for lib in missing_libraries])
+            
+        # 检查MSVC工具
+        missing_tools = self._check_msvc_tools()
+        if missing_tools:
+            missing_components.extend(missing_tools)
+            
+        # 如果有缺失的组件，显示警告
+        if missing_components:
+            warning_msg = "编译环境检测失败，缺少以下组件：\n\n"
+            warning_msg += "\n".join(missing_components)
+            warning_msg += "\n\n请安装这些组件后再尝试编译安装。"
+            messagebox.showwarning("编译环境不完整", warning_msg)
+            return False
+            
+        self.update_result_text("编译环境检测通过，可以开始编译安装。\n\n")
+        return True
+        
+    def _check_python_build_libraries(self):
+        """检查setuptools和wheel库是否已安装"""
+        missing_libraries = []
+        required_libraries = ["setuptools", "wheel"]
+        
+        for lib in required_libraries:
+            try:
+                kwargs = self._get_subprocess_kwargs(capture_output=True)
+                result = subprocess.run(
+                    [self.python_exe_path, '-m', 'pip', 'show', lib],
+                    **kwargs
+                )
+                
+                if result.returncode != 0:
+                    missing_libraries.append(lib)
+            except Exception:
+                missing_libraries.append(lib)
+                
+        return missing_libraries
+        
+    def _check_msvc_tools(self):
+        """检查系统是否安装了MSVC的C++桌面开发、Windows SDK和C++ CMake工具"""
+        missing_tools = []
+        
+        # 使用vswhere工具检测Visual Studio组件
+        try:
+            # 尝试直接检测编译器是否可用
+            if self._check_cl_compiler_available():
+                # 如果编译器可用，跳过其他详细检测
+                return missing_tools
+                
+            # 查找vswhere工具
+            vswhere_path = None
+            
+            # 检查常见的vswhere路径
+            program_files = os.environ.get('ProgramFiles(x86)', 'C:\Program Files (x86)')
+            possible_paths = [
+                os.path.join(program_files, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe'),
+                os.path.join(os.environ.get('ProgramFiles', 'C:\Program Files'), 'Microsoft Visual Studio', 'Installer', 'vswhere.exe')
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    vswhere_path = path
+                    break
+            
+            # 如果找不到vswhere，尝试通过where命令查找
+            if not vswhere_path:
+                kwargs = self._get_subprocess_kwargs(capture_output=True)
+                result = subprocess.run(['where', 'vswhere.exe'], **kwargs)
+                if result.returncode == 0 and result.stdout:
+                    vswhere_path = result.stdout.strip().split('\n')[0]
+                    
+            # 如果找到了vswhere，使用它检测组件
+            vs_components_found = False
+            if vswhere_path:
+                # 扩展版本范围，支持VS2017 (15.0), VS2019 (16.0), VS2022 (17.0)
+                version_range = '15.0,16.0,17.0'
+                
+                kwargs = self._get_subprocess_kwargs(capture_output=True)
+                
+                # 检测C++桌面开发工作负载或编译器组件
+                cpp_results = []
+                # 尝试不同的C++开发相关组件ID
+                cpp_components = [
+                    'Microsoft.VisualStudio.Workload.NativeDesktop',  # C++桌面开发
+                    'Microsoft.VisualStudio.Workload.VCTools',         # C++生成工具
+                    'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'  # C++编译器
+                ]
+                
+                for comp_id in cpp_components:
+                    result = subprocess.run(
+                        [vswhere_path, '-products', '*', '-requires', comp_id, '-version', version_range, '-latest', '-property', 'installationPath'],
+                        **kwargs
+                    )
+                    if result.stdout.strip():
+                        cpp_results.append(True)
+                        break
+                    
+                if not any(cpp_results):
+                    missing_tools.append("MSVC C++开发工具")
+                else:
+                    vs_components_found = True
+                    
+                # 检测Windows SDK (允许没有SDK，因为某些库可能不需要)
+                # 检测CMake工具 (允许没有CMake，因为某些库可能不需要)
+                    
+            # 如果vswhere没有检测到，但编译器路径检测到，也认为环境可用
+            if not vs_components_found:
+                # 扩展编译器路径检测，包括更多VS版本和路径模式
+                compiler_found = self._check_compiler_paths()
+                
+                if not compiler_found:
+                    # 提供忽略检测的选项
+                    if messagebox.askyesno("检测提示", "未检测到MSVC编译器，但您确认已安装。\n\n是否跳过环境检测继续编译安装？"):
+                        return []  # 用户确认已安装，返回空列表表示环境满足
+                    missing_tools.append("未检测到MSVC编译器")
+                    missing_tools.append("请确认已安装Visual Studio或Build Tools及C++开发组件")
+                    
+        except Exception as e:
+            missing_tools.append(f"检测MSVC工具时出错: {str(e)}")
+            # 出错时也提供跳过检测的选项
+            if messagebox.askyesno("检测错误", f"检测MSVC工具时出错: {str(e)}\n\n是否跳过环境检测继续编译安装？"):
+                return []
+            
+        return missing_tools
+        
+    def _check_cl_compiler_available(self):
+        """直接检查cl.exe编译器是否可用"""
+        try:
+            kwargs = self._get_subprocess_kwargs(capture_output=True)
+            # 尝试运行cl.exe /?命令
+            result = subprocess.run(['cl.exe', '/?'], **kwargs)
+            # 如果返回码为0或1(通常cl.exe /?返回1但有输出)且有输出，表示编译器可用
+            return result.returncode in [0, 1] and result.stdout
+        except Exception:
+            return False
+            
+    def _check_compiler_paths(self):
+        """检查更多可能的编译器路径"""
+        program_files = os.environ.get('ProgramFiles(x86)', 'C:\Program Files (x86)')
+        program_files64 = os.environ.get('ProgramFiles', 'C:\Program Files')
+        
+        # 扩展编译器路径模式，包括更多VS版本和架构
+        compiler_path_patterns = [
+            # VS2022路径
+            os.path.join(program_files, 'Microsoft Visual Studio', '2022', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx64', 'x64', 'cl.exe'),
+            os.path.join(program_files, 'Microsoft Visual Studio', '2022', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx86', 'x86', 'cl.exe'),
+            # VS2019路径
+            os.path.join(program_files, 'Microsoft Visual Studio', '2019', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx64', 'x64', 'cl.exe'),
+            os.path.join(program_files, 'Microsoft Visual Studio', '2019', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx86', 'x86', 'cl.exe'),
+            # VS2017路径
+            os.path.join(program_files, 'Microsoft Visual Studio', '2017', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx64', 'x64', 'cl.exe'),
+            os.path.join(program_files, 'Microsoft Visual Studio', '2017', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx86', 'x86', 'cl.exe'),
+            # 64位Program Files下的路径
+            os.path.join(program_files64, 'Microsoft Visual Studio', '*', '*', 'VC', 'Tools', 'MSVC', '*', 'bin', 'Hostx64', 'x64', 'cl.exe'),
+            # 直接在PATH中的cl.exe
+            'cl.exe'  # 如果在PATH中可以直接找到
+        ]
+        
+        # 检查注册表中的编译器路径
+        try:
+            import winreg
+            # 尝试从注册表获取Visual Studio安装路径
+            vs_reg_paths = [
+                r'SOFTWARE\Microsoft\VisualStudio\SxS\VS7',
+                r'SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7'
+            ]
+            
+            for reg_path in vs_reg_paths:
+                try:
+                    key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path)
+                    i = 0
+                    while True:
+                        try:
+                            version, path, _ = winreg.EnumValue(key, i)
+                            if path and os.path.exists(os.path.join(path, 'VC', 'Tools', 'MSVC')):
+                                # 找到了VS安装路径，认为编译器可能存在
+                                return True
+                            i += 1
+                        except OSError:
+                            break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+            
+        # 检查文件系统中的路径
+        import glob
+        for pattern in compiler_path_patterns:
+            try:
+                if pattern == 'cl.exe':
+                    # 直接检查PATH中的cl.exe
+                    kwargs = self._get_subprocess_kwargs(capture_output=True)
+                    result = subprocess.run(['where', 'cl.exe'], **kwargs)
+                    if result.returncode == 0 and result.stdout:
+                        return True
+                else:
+                    # 检查通配符路径
+                    if glob.glob(pattern):
+                        return True
+            except Exception:
+                continue
+                
+        return False
+    
+    def _install_source_thread(self, source_dir):
+        """在新线程中从源代码安装库"""
+        try:
+            # 构建pip install命令
+            command = [self.python_exe_path, '-m', 'pip', 'install', '.']
+            
+            # 添加镜像源参数
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                command.extend(['-i', mirror_url])
+                command.append('--trusted-host')
+                command.append(mirror_url.split('/')[2])  # 添加trusted-host参数
+            
+            # 使用辅助方法获取子进程参数，但明确设置编码以确保正确显示错误信息
+            kwargs = self._get_subprocess_kwargs()
+            kwargs['stdout'] = subprocess.PIPE
+            kwargs['stderr'] = subprocess.PIPE
+            kwargs['cwd'] = source_dir  # 设置工作目录为源代码目录
+            kwargs['encoding'] = 'utf-8'  # 明确指定编码
+            kwargs['errors'] = 'replace'  # 替换无法解码的字符
+            
+            self.update_result_text(f"开始从源代码目录编译安装: {source_dir}\n\n")
+            
+            process = subprocess.Popen(command, **kwargs)
+            
+            # 使用communicate方法一次性读取所有输出，避免死锁
+            stdout, stderr = process.communicate()
+            
+            # 显示标准输出
+            if stdout:
+                self.update_result_text(stdout)
+            
+            # 显示标准错误（错误信息通常在这里）
+            if stderr:
+                self.update_result_text("\n【错误输出】\n")
+                self.update_result_text(stderr)
+            
+            if process.returncode == 0:
+                self.root.after(0, lambda: messagebox.showinfo("安装成功", f"从源代码目录 {os.path.basename(source_dir)} 安装成功!"))
+            else:
+                # 在错误提示中包含更详细的信息
+                error_msg = f"从源代码目录 {os.path.basename(source_dir)} 安装失败!\n\n" \
+                           f"请查看右侧输出窗口了解详细的错误信息。\n" \
+                           f"常见原因包括：编译环境缺失(MSVC)、依赖不满足、Python版本不兼容等。\n" \
+                           f"您可以尝试先安装编译依赖，或检查MSVC是否正确安装。"
+                self.root.after(0, lambda: messagebox.showerror("安装失败", error_msg))
+        except Exception as e:
+            self.update_result_text(f"从源代码安装时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
         uninstall_thread.daemon = True
         uninstall_thread.start()
         
