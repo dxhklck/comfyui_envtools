@@ -12,6 +12,8 @@
 
 **更新内容：**
 
+- 小工具的使用说明，请参照B站视频：https://www.bilibili.com/video/BV1pwHfzkEFs/?spm_id_from=333.1387.homepage.video_card.click&vd_source=c1985a7ed12db7995eeb206791daddbd
+- 10月3日更新版本v2.3版本。增加了cmd命令行执行，不用再打开黑窗口执行命令，参数说明列出pip install的相关参数，增加了轮子安装和编译安装。
 - 9月17日，环境使用下拉列表，并且会在程序当前目录中产生一个保存环境的文本文件，不用每次都去找环境地址。
 - 优化了程序界面布局和响应速度
 - 增强了镜像源测试和管理功能
