@@ -24,12 +24,13 @@ PYPI_MIRRORS = {
     '清华大学': 'https://pypi.tuna.tsinghua.edu.cn/simple/',
     '中国科学技术大学': 'https://pypi.mirrors.ustc.edu.cn/simple/',
     '豆瓣': 'https://pypi.douban.com/simple/',
-    '华为云': 'https://mirrors.huaweicloud.com/repository/pypi/simple/'
+    '华为云': 'https://mirrors.huaweicloud.com/repository/pypi/simple/',
+    '腾讯云': 'https://mirrors.cloud.tencent.com/pypi/simple/'
 }
 
 # 配置项类 - 将分散的配置集中管理
 class Config:
-    VERSION = "V2.3"
+    VERSION = "V2.4"
     LOCK_FILE_PATH = os.path.join(tempfile.gettempdir(), 'environment_checker.lock')
     MAX_THREAD_WORKERS = 4  # 最大线程数量
     DEFAULT_TIMEOUT = 30  # 默认超时时间(秒)
@@ -129,8 +130,8 @@ class EnvironmentCheckerApp:
     def __init__(self, root):
         self.root = root
         self.root.title(f"ComfyUI中Python环境维护小工具 {Config.VERSION} 练老师 QQ群: 723799422")
-        self.root.geometry("1200x770")
-        self.root.minsize(1000, 760)
+        self.root.geometry("1200x800")
+        self.root.minsize(1000, 800)
         
         # 设置窗口图标
         try:
@@ -184,8 +185,8 @@ class EnvironmentCheckerApp:
         self.progress_var = tk.DoubleVar()
         # Python环境路径列表
         self.python_paths = []
-        # Python环境JSON文件路径 - 使用当前工作目录，确保打包成exe后能在运行目录生成文件
-        self.python_addr_file = os.path.join(os.getcwd(), 'python_addr.json')
+        # 配置文件路径 - 使用当前工作目录，确保打包成exe后能在运行目录生成文件
+        self.config_file = os.path.join(os.getcwd(), 'config.json')
         
         # 初始化Python环境列表
         self._init_python_environments()
@@ -194,14 +195,19 @@ class EnvironmentCheckerApp:
         self.create_widgets()
     
     def _init_python_environments(self):
-        """初始化Python环境列表，仅从文件读取"""
+        """初始化Python环境列表，从配置文件读取"""
         # 如果文件存在，读取已保存的Python环境路径
-        if os.path.exists(self.python_addr_file):
+        if os.path.exists(self.config_file):
             try:
-                with open(self.python_addr_file, 'r', encoding='utf-8') as f:
-                    self.python_paths = json.load(f)
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    # 从配置文件中获取Python路径列表
+                    self.python_paths = config.get('python_paths', [])
+                    # 如果配置文件中有最快镜像的设置，应用它
+                    if 'fastest_mirror' in config:
+                        self.selected_mirror = config['fastest_mirror']
             except Exception as e:
-                print(f"读取python_addr.json文件失败: {e}")
+                print(f"读取config.json文件失败: {e}")
                 self.python_paths = []
         else:
             # 文件不存在时，初始化空列表
@@ -217,12 +223,25 @@ class EnvironmentCheckerApp:
             self.python_env_path = ""
       
     def _save_python_environments(self):
-        """保存Python环境列表到文件"""
+        """保存Python环境列表到配置文件"""
         try:
-            with open(self.python_addr_file, 'w', encoding='utf-8') as f:
-                json.dump(self.python_paths, f, ensure_ascii=False, indent=2)
+            # 如果文件存在，读取现有配置
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            # 更新Python路径列表
+            config['python_paths'] = self.python_paths
+            # 确保保留最快镜像的设置
+            if hasattr(self, 'selected_mirror') and self.selected_mirror:
+                config['fastest_mirror'] = self.selected_mirror
+            
+            # 保存更新后的配置
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存python_addr.json文件失败: {e}")
+            print(f"保存config.json文件失败: {e}")
         
     def create_widgets(self):
         # 创建主框架
@@ -331,6 +350,13 @@ class EnvironmentCheckerApp:
 
         view_btn = ttk.Button(btn_container, text="查看当前环境", command=self.view_current_env, width=btn_width)
         view_btn.pack(side=tk.LEFT, padx=8, pady=2)
+        
+        # 添加一个占位元素，将环境升级迁移按钮推到右侧
+        ttk.Label(btn_container).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # 环境升级迁移按钮
+        migrate_btn = ttk.Button(btn_container, text="环境升级迁移", command=self.start_environment_migration, width=btn_width)
+        migrate_btn.pack(side=tk.LEFT, padx=8, pady=2)
 
         # 第二行按钮
         btn_container2 = ttk.Frame(btn_frame)
@@ -1216,6 +1242,219 @@ class EnvironmentCheckerApp:
         """清空右侧结果显示区域"""
         self.result_text.delete(1.0, tk.END)
         
+    def start_environment_migration(self):
+        """开始环境升级迁移"""
+        # 检查是否有可用的Python环境
+        if not self.python_paths or len(self.python_paths) < 2:
+            messagebox.showwarning("警告", "至少需要两个Python环境才能进行迁移")
+            return
+            
+        # 创建环境选择对话框
+        from tkinter import simpledialog
+        
+        class EnvironmentMigrationDialog(simpledialog.Dialog):
+            def __init__(self, parent, environments, icon_path=None):
+                self.environments = environments
+                self.source_env = None
+                self.target_env = None
+                self.icon_path = icon_path
+                super().__init__(parent, title="环境升级迁移")
+                
+            def body(self, master):
+                # 设置对话框图标
+                if self.icon_path and os.path.exists(self.icon_path):
+                    try:
+                        self.iconbitmap(self.icon_path)
+                    except:
+                        # 图标设置失败不影响程序运行
+                        pass
+                        
+                # 源环境选择
+                ttk.Label(master, text="源环境（要迁移的环境）:").grid(row=0, column=0, sticky=tk.W, pady=5)
+                self.source_var = tk.StringVar()
+                source_combobox = ttk.Combobox(master, textvariable=self.source_var, values=self.environments, state="readonly", width=50)
+                source_combobox.grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
+                if self.environments:
+                    source_combobox.current(0)
+                    
+                # 目标环境选择
+                ttk.Label(master, text="目标环境（要迁移到的环境）:").grid(row=1, column=0, sticky=tk.W, pady=5)
+                self.target_var = tk.StringVar()
+                target_combobox = ttk.Combobox(master, textvariable=self.target_var, values=self.environments, state="readonly", width=50)
+                target_combobox.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
+                if len(self.environments) > 1:
+                    target_combobox.current(1)
+                    
+                return source_combobox
+                
+            def apply(self):
+                self.source_env = self.source_var.get()
+                self.target_env = self.target_var.get()
+        
+        # 设置图标路径
+        icon_path = "favicon.ico"
+        if not os.path.exists(icon_path):
+            # 如果相对路径不存在，使用程序所在目录
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favicon.ico")
+            
+        # 显示对话框
+        dialog = EnvironmentMigrationDialog(self.root, self.python_paths, icon_path)
+        
+        # 当用户点击确定按钮且选择的源环境和目标环境不同时执行迁移
+        if dialog.source_env and dialog.target_env and dialog.source_env != dialog.target_env:
+            # 二次确认
+            confirm_result = messagebox.askyesno(
+                "确认环境迁移",
+                f"您确定要将源环境 '{dialog.source_env}' 中的包迁移到目标环境 '{dialog.target_env}' 吗？\n\n"
+                "此操作将在目标环境中安装源环境中存在但目标环境中不存在的包。"
+            )
+            
+            if confirm_result:
+                # 用户确认后开始迁移
+                # 显示进度条
+                self.progress_bar.pack(fill=tk.X, pady=5)
+                self.progress_var.set(0)
+                self.update_result_text(f"开始从源环境 '{dialog.source_env}' 迁移到目标环境 '{dialog.target_env}' ...\n\n")
+                
+                # 在新线程中执行迁移
+                migration_thread = Thread(target=self._perform_environment_migration, 
+                                         args=(dialog.source_env, dialog.target_env))
+                migration_thread.daemon = True
+                migration_thread.start()
+        elif dialog.source_env == dialog.target_env and dialog.source_env is not None:
+            # 只有当源环境和目标环境相同且不为None时（用户点击了确定按钮）才显示警告
+            messagebox.showwarning("警告", "源环境和目标环境不能相同")
+    
+    def _perform_environment_migration(self, source_env, target_env):
+        """执行环境迁移，从源环境迁移到目标环境"""
+        try:
+            # 获取源环境中已安装的包列表
+            self.update_result_text(f"正在获取源环境 '{source_env}' 中已安装的包列表...\n")
+            source_packages = self._get_installed_packages(source_env)
+            
+            if not source_packages:
+                self.update_result_text(f"无法获取源环境中的包列表或源环境中没有已安装的包\n")
+                self.root.after(0, lambda: self.progress_bar.pack_forget())
+                return
+                
+            # 获取目标环境中已安装的包列表
+            self.update_result_text(f"正在获取目标环境 '{target_env}' 中已安装的包列表...\n")
+            target_packages = self._get_installed_packages(target_env)
+            
+            # 计算需要安装的包（在源环境中存在但在目标环境中不存在的包）
+            packages_to_install = []
+            for package_name, package_version in source_packages.items():
+                if package_name.lower() not in [p.lower() for p in target_packages.keys()]:
+                    packages_to_install.append((package_name, package_version))
+                    
+            total_packages = len(packages_to_install)
+            self.update_result_text(f"找到 {total_packages} 个需要安装的包\n\n")
+            
+            if total_packages == 0:
+                self.update_result_text(f"目标环境已经包含源环境中的所有包，无需迁移\n")
+                self.root.after(0, lambda: self.progress_bar.pack_forget())
+                return
+                
+            # 安装包
+            success_count = 0
+            failed_packages = []
+            
+            # 确保进度条在主线程中显示
+            self.root.after(0, lambda: self.progress_bar.pack(fill=tk.X, pady=5))
+            
+            for i, (package_name, package_version) in enumerate(packages_to_install):
+                # 更新进度条
+                progress = (i + 1) / total_packages * 100
+                self.root.after(0, lambda p=progress: self.progress_var.set(p))
+                
+                # 安装包
+                self.update_result_text(f"正在安装 {package_name}=={package_version} ... ({int(progress)}% 完成)\n")
+                success = self._install_package(target_env, package_name, package_version)
+                
+                if success:
+                    success_count += 1
+                    self.update_result_text(f"✓ 安装成功: {package_name}=={package_version}\n\n")
+                else:
+                    failed_packages.append(f"{package_name}=={package_version}")
+                    self.update_result_text(f"✗ 安装失败: {package_name}=={package_version}\n\n")
+                
+            # 显示结果
+            self.update_result_text("="*60 + "\n")
+            self.update_result_text(f"环境迁移完成！\n")
+            self.update_result_text(f"成功安装: {success_count} 个包\n")
+            self.update_result_text(f"安装失败: {len(failed_packages)} 个包\n\n")
+            
+            if failed_packages:
+                self.update_result_text("失败的包列表:\n")
+                for package in failed_packages:
+                    self.update_result_text(f"- {package}\n")
+                
+                # 询问用户是否保存失败的包列表
+                self.root.after(0, lambda packages=failed_packages: self._ask_save_failed_packages(packages))
+        except Exception as e:
+            self.update_result_text(f"执行环境迁移时出错: {str(e)}\n")
+        finally:
+            # 隐藏进度条
+            self.root.after(0, lambda: self.progress_bar.pack_forget())
+    
+    def _get_installed_packages(self, python_env):
+        """获取指定Python环境中已安装的包列表"""
+        try:
+            cmd = [python_env, '-m', 'pip', 'list', '--format=json']
+            kwargs = self._get_run_subprocess_kwargs(capture_output=True, timeout=Config.DEFAULT_TIMEOUT)
+            result = subprocess.run(cmd, **kwargs)
+            
+            if result.returncode == 0 and result.stdout:
+                packages = json.loads(result.stdout)
+                return {pkg['name']: pkg['version'] for pkg in packages}
+            else:
+                self.update_result_text(f"获取包列表失败，返回代码: {result.returncode}\n")
+                return {}
+        except Exception as e:
+            self.update_result_text(f"获取包列表时出错: {str(e)}\n")
+            return {}
+    
+    def _install_package(self, python_env, package_name, package_version):
+        """在指定Python环境中安装包"""
+        try:
+            # 构建安装命令
+            cmd = [python_env, '-m', 'pip', 'install', f'{package_name}=={package_version}', '--no-deps']
+            
+            # 添加镜像源设置
+            mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
+            if mirror_url:
+                cmd.extend(['--index-url', mirror_url])
+                host = mirror_url.split('/')[2]  # 获取主机名
+                cmd.extend(['--trusted-host', host])
+            
+            # 执行安装命令
+            kwargs = self._get_run_subprocess_kwargs(capture_output=True, timeout=Config.DEFAULT_TIMEOUT*2)
+            result = subprocess.run(cmd, **kwargs)
+            
+            return result.returncode == 0
+        except Exception as e:
+            return False
+    
+    def _ask_save_failed_packages(self, failed_packages):
+        """询问用户是否保存失败的包列表"""
+        if messagebox.askyesno("保存失败的包", "是否将失败的包列表保存到文件中？"):
+            # 让用户选择保存路径
+            file_path = filedialog.asksaveasfilename(
+                title="保存失败的包列表",
+                defaultextension=".txt",
+                filetypes=[("文本文件", "*.txt"), ("所有文件", "*")],
+                initialfile="failed_packages.txt"
+            )
+            
+            if file_path:
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        for package in failed_packages:
+                            f.write(f"{package}\n")
+                    self.update_result_text(f"失败的包列表已保存到: {file_path}\n")
+                except Exception as e:
+                    messagebox.showerror("保存失败", f"保存失败的包列表时出错: {str(e)}")
+    
     def show_pip_params(self):
         """显示pip install命令的常用参数说明"""
         # 清空结果区域
@@ -1261,6 +1500,14 @@ class EnvironmentCheckerApp:
             messagebox.showwarning("警告", "请输入要执行的命令")
             return
         
+        # 检查命令是否以pip或pip3开头
+        cmd_parts = command.split()
+        if len(cmd_parts) > 0 and cmd_parts[0].lower() in ['pip', 'pip3'] and self.python_exe_path:
+            # 为pip/pip3命令添加python.exe -m前缀
+            modified_command = f'"{self.python_exe_path}" -m {command}'
+            self.cmd_var.set(modified_command)
+            command = modified_command
+        
         # 显示进度条
         self.progress_bar.pack(fill=tk.X, pady=5)
         self.progress_var.set(20)  # 设置初始进度
@@ -1273,6 +1520,12 @@ class EnvironmentCheckerApp:
     def _execute_command_thread(self, command):
         """在新线程中执行命令"""
         try:
+            # 显示当前使用的Python环境
+            if self.python_exe_path:
+                self.update_result_text(f"当前使用的Python环境: {self.python_exe_path}\n\n")
+            else:
+                self.update_result_text(f"未选择Python环境\n\n")
+                
             self.update_result_text(f"执行命令: {command}\n\n")
             
             # 获取子进程参数，使用shell=True来支持完整的CMD命令
@@ -1280,7 +1533,9 @@ class EnvironmentCheckerApp:
             kwargs['stdout'] = subprocess.PIPE
             kwargs['stderr'] = subprocess.PIPE
             kwargs['shell'] = True  # 允许执行完整的CMD命令
-            kwargs['encoding'] = 'utf-8'  # 明确指定编码
+            
+            # 使用与Windows cmd窗口一致的编码（gbk）
+            kwargs['encoding'] = 'gbk'  # 使用gbk编码以匹配Windows cmd窗口
             kwargs['errors'] = 'replace'  # 替换无法解码的字符
             
             # 设置命令执行的工作目录为所选Python环境目录
@@ -2580,6 +2835,32 @@ class EnvironmentCheckerApp:
         self.selected_mirror = self.mirror_var.get()
         mirror_url = PYPI_MIRRORS.get(self.selected_mirror, '')
         self.update_result_text(f"已切换到镜像源: {self.selected_mirror}{' (' + mirror_url + ')' if mirror_url else ''}\n\n")
+        
+        # 保存选择的镜像源到配置文件
+        self._save_mirror_selection()
+        
+    def _save_mirror_selection(self):
+        """保存选择的镜像源到配置文件"""
+        try:
+            # 如果文件存在，读取现有配置
+            config = {}
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            
+            # 更新最快镜像源的设置
+            config['fastest_mirror'] = self.selected_mirror
+            
+            # 保存更新后的配置
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+                self.update_result_text(f"镜像源选择已保存到配置文件: {self.config_file}\n")
+        except Exception as e:
+            # 在GUI应用中，使用消息框显示错误信息会比控制台打印更友好
+            error_msg = f"保存镜像源选择失败: {e}"
+            print(error_msg)  # 保留控制台输出便于调试
+            # 使用消息框显示错误信息给用户
+            messagebox.showerror("保存失败", error_msg)
         
     def test_mirror_speed(self):
         """测试镜像源速度"""
