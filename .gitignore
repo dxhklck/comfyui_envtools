@@ -1,0 +1,45 @@
+# 虚拟环境
+.venv/
+venv/
+env/
+.env/
+
+# Python 编译缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 构建与发行产物
+build/
+dist/
+.eggs/
+*.egg-info/
+*.egg
+*.whl
+
+# 缓存与临时文件
+.cache/
+.pytest_cache/
+pip-wheel-metadata/
+.mypy_cache/
+
+# 覆盖率/测试
+.coverage
+coverage.xml
+
+# 编辑器与IDE
+.vscode/
+.idea/
+
+# 操作系统杂项
+.DS_Store
+Thumbs.db
+
+# 二进制可执行/动态库（编译产物）
+*.dll
+*.so
+*.dylib
+*.lib
+*.obj
+*.pdb
