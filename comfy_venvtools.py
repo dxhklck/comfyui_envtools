@@ -1376,8 +1376,10 @@ class ComfyVenvTools:
         except Exception as e:
             return {"ok": False, "message": f"更新异常: {str(e)}"}
 
-    def git_clone(self, url: str, dest: str) -> Dict[str, object]:
-        """克隆Git插件到指定目录，返回 {ok, path, message}。"""
+    def git_clone(self, url: str, dest: str, progress_cb: Optional[Callable[[str], None]] = None) -> Dict[str, object]:
+        """克隆Git插件到指定目录，返回 {ok, path, message}。
+        progress_cb: 可选的回调函数，用于实时显示克隆进度信息
+        """
         if not url:
             return {"ok": False, "path": None, "message": "未提供Git地址"}
         if not dest or not os.path.isdir(dest):
@@ -1392,10 +1394,35 @@ class ComfyVenvTools:
             if os.path.isdir(target):
                 return {"ok": True, "path": target, "message": f"仓库已存在: {target}"}
             cmd = ["git", "clone", url]
-            proc = subprocess.run(cmd, cwd=dest, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
-            out = (proc.stdout or "").strip()
+            
+            # 使用Popen实时获取输出
+            proc = subprocess.Popen(cmd, cwd=dest, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                  text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
+            
+            full_output = []
+            # 实时读取输出
+            while proc.poll() is None:
+                if proc.stdout:
+                    line = proc.stdout.readline()
+                    if line:
+                        line = line.strip()
+                        full_output.append(line)
+                        # 调用回调函数显示进度
+                        if progress_cb:
+                            progress_cb(f"[克隆] {line}")
+            
+            # 读取剩余输出
+            if proc.stdout:
+                remaining = proc.stdout.read()
+                if remaining:
+                    remaining = remaining.strip()
+                    full_output.append(remaining)
+                    if progress_cb:
+                        progress_cb(f"[克隆] {remaining}")
+            
+            out = "\n".join(full_output)
             if proc.returncode == 0 and os.path.isdir(target):
-                return {"ok": True, "path": target, "message": f"克隆成功到: {target}\n{out}"}
+                return {"ok": True, "path": target, "message": f"克隆成功到: {target}"}
             return {"ok": False, "path": None, "message": f"克隆失败（返回码{proc.returncode}）:\n{out}"}
         except Exception as e:
             return {"ok": False, "path": None, "message": f"克隆异常: {e}"}

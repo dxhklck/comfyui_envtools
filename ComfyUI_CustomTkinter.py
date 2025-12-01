@@ -5,6 +5,9 @@ import time
 import subprocess
 import sys
 
+# 全局版本号定义
+APP_VERSION = "ver2.5.1"
+
 # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
 if sys.platform == 'win32':
     CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW
@@ -25,7 +28,7 @@ ctk.set_default_color_theme("blue")
 class ComfyUIEnvironmentManager(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("ComfyUI中Python环境维护小工具 V2.5 练老师 QQ群: 723799422")
+        self.title(f"ComfyUI中Python环境维护小工具 {APP_VERSION} 练老师 QQ群: 723799422")
         self.geometry("1100x650")
         self.minsize(1000, 600)
 
@@ -167,14 +170,14 @@ class ComfyUIEnvironmentManager(ctk.CTk):
 
         # Git 克隆插件行
         s2r3 = ctk.CTkFrame(sec2); s2r3.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s2r3, text="Git Clone 插件地址:").pack(side='left')
+        ctk.CTkLabel(s2r3, text="插件地址:").pack(side='left')
         self.git_url_var = ctk.StringVar()
         # 改用下拉列表，来源于历史记录，可在克隆后自动加入
         self.git_url_cb = ctk.CTkComboBox(s2r3, variable=self.git_url_var, values=self.plugin_history, width=200)
         self.git_url_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(s2r3, text="安装", width=40, command=self.clone_plugin_into_customnodes).pack(side='left', padx=2)
-        ctk.CTkButton(s2r3, text="更新", width=40, command=self.check_plugin_updates).pack(side='left', padx=2)
-        ctk.CTkButton(s2r3, text="刷新", width=40, command=self.refresh_git_plugin_list).pack(side='left', padx=2)      
+        ctk.CTkButton(s2r3, text="安装插件", width=40, command=self.clone_plugin_into_customnodes).pack(side='left', padx=2)
+        ctk.CTkButton(s2r3, text="检测更新", width=40, command=self.check_plugin_updates).pack(side='left', padx=2)
+        ctk.CTkButton(s2r3, text="更新插件", width=40, command=self.update_selected_plugin).pack(side='left', padx=2)      
 
         # 3 Comfy环境操作
         sec3 = self._section(self.left, "ComfyUI环境操作")
@@ -346,6 +349,12 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 elif kind == 'update_error':
                     try:
                         item[1]()  # 执行错误处理函数
+                    except Exception:
+                        pass
+                elif kind == 'update_git_combobox':
+                    try:
+                        values = item[1] or []
+                        self.git_url_cb.configure(values=values)
                     except Exception:
                         pass
         except Empty:
@@ -1974,22 +1983,76 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         
         Thread(target=search_plugins, daemon=True).start()
 
-    def refresh_git_plugin_list(self):
-        """手动刷新git插件列表"""
+    def update_selected_plugin(self):
+        """更新选中的插件"""
         try:
+            # 获取选中的URL
+            url = self.git_url_var.get().strip()
+            if not url:
+                self._show_dark_warning("⚠️ 输入验证", 
+                                        "Git插件地址输入框为空，无法进行更新操作。\n请在Git插件地址输入框中输入有效的Git仓库地址。")
+                return
+            
+            # 获取CustomNodes目录
             custom_nodes = self.custom_nodes_var.get().strip()
             if not custom_nodes or not os.path.isdir(custom_nodes):
                 self._show_dark_warning("⚠️ 目录无效警告", 
                                         f"请先设置有效的CustomNodes目录！\n\n当前路径: {custom_nodes if custom_nodes else '未设置'}", 
-                                        "CustomNodes目录无效或不存在，无法扫描插件。\n请先选择或浏览有效的CustomNodes目录。")
+                                        "CustomNodes目录无效或不存在，无法更新插件。\n请先选择或浏览有效的CustomNodes目录。")
                 return
             
-            self._text_enqueue("[刷新] 开始刷新git插件列表...")
-            self._scan_git_plugins(custom_nodes)
-            self._text_enqueue("[刷新] git插件列表刷新完成")
+            # 从URL推断目录名
+            repo_name = url.rstrip('/').split('/')[-1]
+            if repo_name.endswith('.git'):
+                repo_name = repo_name[:-4]
+            plugin_dir = os.path.join(custom_nodes, repo_name)
             
+            # 检查目录是否存在
+            if not os.path.isdir(plugin_dir):
+                self._show_dark_warning("⚠️ 目录不存在", 
+                                        f"插件目录不存在: {plugin_dir}", 
+                                        "无法更新不存在的插件目录。\n请先确保该插件已正确安装。")
+                return
+            
+            # 在后台线程中执行更新，避免UI阻塞
+            import threading
+            threading.Thread(target=self._update_plugin_async, args=(url, plugin_dir, repo_name), daemon=True).start()
+                
         except Exception as e:
-            self._text_enqueue(f"[刷新] 刷新插件列表失败: {e}")
+            self._text_enqueue(f"[更新] 更新插件失败: {e}")
+    
+    def _update_plugin_async(self, url: str, plugin_dir: str, repo_name: str):
+        """异步更新插件"""
+        try:
+            self._text_enqueue(f"[更新] 开始更新插件: {repo_name}")
+            
+            # 执行git pull更新插件
+            cmd = ["git", "pull"]
+            proc = subprocess.Popen(cmd, cwd=plugin_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                  text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
+            
+            # 实时读取输出
+            while proc.poll() is None:
+                if proc.stdout:
+                    line = proc.stdout.readline()
+                    if line:
+                        self._text_enqueue(f"[更新] {line.strip()}")
+                # 添加小延迟，避免CPU占用过高
+                import time
+                time.sleep(0.1)
+            
+            # 读取剩余输出
+            remaining = proc.stdout.read() if proc.stdout else ""
+            if remaining:
+                self._text_enqueue(f"[更新] {remaining.strip()}")
+            
+            if proc.returncode == 0:
+                self._text_enqueue(f"[更新] 插件 {repo_name} 更新成功")
+            else:
+                self._text_enqueue(f"[更新] 插件 {repo_name} 更新失败，返回码: {proc.returncode}")
+                
+        except Exception as e:
+            self._text_enqueue(f"[更新] 更新插件失败: {e}")
 
     def _scan_git_plugins(self, custom_nodes_dir):
         """扫描CustomNodes目录中的git插件，自动添加到插件历史"""
@@ -2653,7 +2716,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             return
 
         # ---- git clone（若已存在则跳过克隆并提示） ----
-        res = self.tools.git_clone(url, dest_dir)
+        res = self.tools.git_clone(url, dest_dir, progress_cb=lambda msg: self._text_enqueue(msg))
         self._text_enqueue(res.get("message", ""))
         if not res.get("ok"):
             return
@@ -2726,10 +2789,11 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             self._text_enqueue("[检查更新] 开始检查插件更新...")
             self._enqueue_progress_show(0.1)
             
-            # 如果插件历史为空，自动扫描git插件
-            if not self.plugin_history or all(not url for url in self.plugin_history):
-                self._text_enqueue("[检查更新] 插件历史为空，开始扫描git插件...")
-                self._scan_git_plugins(custom_nodes)
+            # 重新扫描git插件，更新插件列表
+            self._text_enqueue("[检查更新] 开始扫描git插件...")
+            # 清空现有插件历史，重新扫描
+            self.plugin_history = []
+            self._scan_git_plugins(custom_nodes)
             
             # 获取插件历史中的地址对应的目录
             plugin_dirs = []
@@ -2782,11 +2846,39 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                             else:
                                 self._ui_queue.put(('text', f"  - {plugin_name}: {status}"))
                         
+                        # 更新插件历史，只保留有更新的插件
+                        plugins_to_keep = []
+                        for update in updates:
+                            if update.get('has_update', False):
+                                path = update.get('path', '')
+                                plugin_name = os.path.basename(path)
+                                # 查找对应的URL
+                                for url in self.plugin_history:
+                                    repo_name = url.rstrip('/').split('/')[-1]
+                                    if repo_name.endswith('.git'):
+                                        repo_name = repo_name[:-4]
+                                    if repo_name == plugin_name:
+                                        plugins_to_keep.append(url)
+                                        break
+                        # 更新插件历史，只保留有更新的插件
+                        self.plugin_history = plugins_to_keep
+                        
+                        # 更新UI下拉列表
                         if has_updates_count > 0:
+                            # 有需要更新的插件，显示这些插件
+                            display_history = [''] + self.plugin_history
+                            self._ui_queue.put(('update_git_combobox', display_history))
                             self._ui_queue.put(('text', f"\n[检查更新] 共有 {has_updates_count} 个插件需要更新"))
                             self._ui_queue.put(('text', "可以点击'克隆安装'按钮来更新有变化的插件"))
                         else:
+                            # 所有插件都是最新版本，清空插件历史，只保留空位
+                            self.plugin_history = []
+                            display_history = ['']
+                            self._ui_queue.put(('update_git_combobox', display_history))
                             self._ui_queue.put(('text', "\n[检查更新] 所有插件都是最新版本"))
+                        
+                        # 保存配置
+                        self.save_config()
                     
                 except Exception as e:
                     self._ui_queue.put(('text', f"[检查更新] 检查过程出错: {str(e)}"))
