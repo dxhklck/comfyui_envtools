@@ -2,6 +2,13 @@ import os
 import re
 import time
 import subprocess
+import sys
+
+# 定义平台特定的subprocess创建标志，避免弹出控制台窗口
+if sys.platform == 'win32':
+    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    CREATE_NO_WINDOW = 0
 from typing import Callable, List, Dict, Optional
 
 # 国内常用的pip镜像源（供UI使用）
@@ -62,7 +69,7 @@ class ComfyVenvTools:
             if url:
                 host = url.split('/')[2]
                 cmd += ['--index-url', url, '--trusted-host', host]
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=20)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=20, creationflags=CREATE_NO_WINDOW)
             elapsed = time.time() - start
             if proc.returncode == 0:
                 return f"镜像 {mirror_name} 测试成功，响应时间 {elapsed:.2f}s"
@@ -224,7 +231,7 @@ class ComfyVenvTools:
             if progress_cb:
                 progress_cb(0.3)
             
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=180)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=180, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or '').strip()
             
             if progress_cb:
@@ -300,7 +307,7 @@ class ComfyVenvTools:
             self._last_python_exe = python_exe or self._last_python_exe
             py = python_exe or 'python'
             cmd = [py, '-m', 'pip', 'list', '--format=freeze']
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30, creationflags=CREATE_NO_WINDOW)
             out = proc.stdout or proc.stderr or ''
             return out[:3000]
         except subprocess.TimeoutExpired:
@@ -342,7 +349,7 @@ class ComfyVenvTools:
                 progress_cb(0.3)
             
             # 使用实时输出捕获，提供更好的进度反馈
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             
             output_lines = []
             collected_packages = []
@@ -449,7 +456,7 @@ class ComfyVenvTools:
                 host = url.split('/')[2]
                 cmd += ['--index-url', url, '--trusted-host', host, '--extra-index-url', 'https://pypi.org/simple', '--trusted-host', 'pypi.org']
             try:
-                r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=600)
+                r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=600, creationflags=CREATE_NO_WINDOW)
                 out = (r.stdout or '').strip()
                 if r.returncode == 0:
                     success_count += 1
@@ -488,7 +495,7 @@ class ComfyVenvTools:
         """生成当前环境快照文件（pip freeze），返回保存路径以便前端后续比较。"""
         py = self._last_python_exe or 'python'
         try:
-            proc = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60)
+            proc = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             content = (proc.stdout or '').strip()
             ts = int(time.time())
             out_path = os.path.join(os.getcwd(), f'env_snapshot_{ts}.txt')
@@ -505,7 +512,7 @@ class ComfyVenvTools:
         """
         py = python_exe or self._last_python_exe or 'python'
         try:
-            proc = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60)
+            proc = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             content = (proc.stdout or '').strip()
             ts = int(time.time())
             target = out_path or os.path.join(os.getcwd(), f'env_snapshot_{ts}.txt')
@@ -522,7 +529,7 @@ class ComfyVenvTools:
         """运行 pip check 输出冲突信息。"""
         py = self._last_python_exe or 'python'
         try:
-            proc = subprocess.run([py, '-m', 'pip', 'check'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60)
+            proc = subprocess.run([py, '-m', 'pip', 'check'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or proc.stderr or '').strip()
             if proc.returncode == 0:
                 return out or "[冲突检查] 未发现依赖冲突"
@@ -541,7 +548,7 @@ class ComfyVenvTools:
         """列出过期包，提供升级建议（不直接升级）。"""
         py = self._last_python_exe or 'python'
         try:
-            proc = subprocess.run([py, '-m', 'pip', 'list', '--outdated'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60)
+            proc = subprocess.run([py, '-m', 'pip', 'list', '--outdated'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or '').strip()
             if not out:
                 return "[迁移] 未检测到可升级的包"
@@ -579,7 +586,7 @@ class ComfyVenvTools:
 
         try:
             # 当前环境 freeze
-            cur = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60)
+            cur = subprocess.run([py, '-m', 'pip', 'freeze'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             cur_txt = (cur.stdout or '').strip()
             # 写入当前临时文件用于对比（不落盘也可，直接解析）
             current_pkgs: Dict[str, str] = {}
@@ -632,7 +639,7 @@ class ComfyVenvTools:
             if url:
                 args.extend(['-i', url])
         try:
-            proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=600)
+            proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=600, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or proc.stderr or '').strip()
             if proc.returncode == 0:
                 return "[迁移] 已根据快照安装/同步依赖。\n\n" + out[:2500]
@@ -706,7 +713,7 @@ class ComfyVenvTools:
         msgs: List[str] = []
         # 已安装版本
         try:
-            r = subprocess.run([py, '-m', 'pip', 'show', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace')
+            r = subprocess.run([py, '-m', 'pip', 'show', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             if r.returncode == 0 and r.stdout:
                 for line in r.stdout.splitlines():
                     if line.startswith('Version: '):
@@ -726,7 +733,7 @@ class ComfyVenvTools:
                 host = mirror_url.split('/')[2]
                 cmd += ['--index-url', mirror_url, '--trusted-host', host]
             
-            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=15)
+            r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW)
             if r.returncode == 0 and r.stdout:
                 lines = r.stdout.splitlines()
                 # 查找包含版本信息的行
@@ -761,7 +768,7 @@ class ComfyVenvTools:
             try:
                 alt = subprocess.run([py, '-m', 'pip', 'install', f'{name}==*', '--dry-run'], 
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
-                                   text=True, errors='replace', timeout=15)
+                                   text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW)
                 err = alt.stderr or ''
                 stdout = alt.stdout or ''
                 
@@ -803,7 +810,7 @@ class ComfyVenvTools:
             return "请输入搜索关键字"
         py = self._last_python_exe or 'python'
         try:
-            r = subprocess.run([py, '-m', 'pip', 'list', '--format=columns'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace')
+            r = subprocess.run([py, '-m', 'pip', 'list', '--format=columns'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             if r.returncode != 0:
                 return "本地包列表获取失败"
             lines = (r.stdout or '').strip().splitlines()
@@ -1385,7 +1392,7 @@ class ComfyVenvTools:
             if os.path.isdir(target):
                 return {"ok": True, "path": target, "message": f"仓库已存在: {target}"}
             cmd = ["git", "clone", url]
-            proc = subprocess.run(cmd, cwd=dest, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+            proc = subprocess.run(cmd, cwd=dest, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or "").strip()
             if proc.returncode == 0 and os.path.isdir(target):
                 return {"ok": True, "path": target, "message": f"克隆成功到: {target}\n{out}"}
@@ -1429,7 +1436,7 @@ class ComfyVenvTools:
                 
             # 使用pip list一次性获取所有已安装的包
             cmd = [python_exe, '-m', 'pip', 'list', '--format=json']
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30, creationflags=CREATE_NO_WINDOW)
             
             if progress_cb:
                 progress_cb(0.15)
@@ -1489,7 +1496,7 @@ class ComfyVenvTools:
         """通过 pip show 判断包是否已安装。"""
         try:
             cmd = [python_exe, '-m', 'pip', 'show', name] if python_exe else ['pip', 'show', name]
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace')
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             return proc.returncode == 0
         except Exception:
             return False

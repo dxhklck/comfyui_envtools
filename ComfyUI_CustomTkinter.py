@@ -3,6 +3,13 @@ import json
 import sys
 import time
 import subprocess
+import sys
+
+# 定义平台特定的subprocess创建标志，避免弹出控制台窗口
+if sys.platform == 'win32':
+    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    CREATE_NO_WINDOW = 0
 import re
 from threading import Thread
 from queue import Queue, Empty
@@ -441,7 +448,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                         drives.append(f"{drive_name}")
             return drives if drives else ["C: - 本地磁盘"]
         except Exception as e:
-            print(f"Drive detection error: {e}")
+            # 使用内部日志机制替代print，避免弹黑窗
+            self._text_enqueue(f"[驱动器检测] 错误: {e}")
             # 如果win32api不可用，返回基本驱动器
             return ["C: - 本地磁盘", "D: - 本地磁盘", "E: - 本地磁盘"]
     
@@ -946,7 +954,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                             proc.terminate()
                         except Exception:
                             try:
-                                subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True)
+                                subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
                             except Exception:
                                 pass
             except Exception:
@@ -1494,7 +1502,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     elif len(parts) == 1:
                         desired[(parts[0] or '').strip().lower()] = ''
             self._text_enqueue(f"[库列表还原] 列表包数量: {len(desired)}")
-            res = subprocess.run([python_exe, '-m', 'pip', 'list', '--format=json'], capture_output=True, text=True, timeout=300)
+            res = subprocess.run([python_exe, '-m', 'pip', 'list', '--format=json'], capture_output=True, text=True, timeout=300, creationflags=CREATE_NO_WINDOW)
             installed_json = (res.stdout or '').strip() if res.returncode == 0 else '[]'
             try:
                 installed_list = json.loads(installed_json)
@@ -1531,7 +1539,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     self._text_enqueue(f"[库列表还原] 卸载 {name} ({i+1}/{total_un})")
                     cmd = [python_exe, '-m', 'pip', 'uninstall', '-y', name]
                     try:
-                        subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                        subprocess.run(cmd, capture_output=True, text=True, timeout=600, creationflags=CREATE_NO_WINDOW)
                     except Exception as e:
                         self._text_enqueue(f"[库列表还原] 卸载出错: {name} - {e}")
                     self._enqueue_progress(0.1 + (i + 1) / max(total_un, 1) * 0.3)
@@ -1553,7 +1561,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 self._text_enqueue(f"[库列表还原] 安装 {spec} ({i+1}/{total_in})")
                 cmd = base_cmd + [spec]
                 try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200, creationflags=CREATE_NO_WINDOW)
                     if result.returncode != 0:
                         err_text = (result.stderr or '') + '\n' + (result.stdout or '')
                         need_retry = ('No matching distribution found' in err_text) or ('Could not find a version that satisfies' in err_text)
@@ -1566,7 +1574,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                                 fallback_cmd.append('--upgrade')
                             fallback_cmd.append(spec)
                             try:
-                                retry = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=1200)
+                                retry = subprocess.run(fallback_cmd, capture_output=True, text=True, timeout=1200, creationflags=CREATE_NO_WINDOW)
                                 if retry.returncode != 0:
                                     failed_packages.append(spec)
                                     msg = (retry.stderr or '').strip().split('\n')[-5:]
@@ -2007,13 +2015,16 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 
                 # 尝试获取远程仓库URL
                 try:
+                    # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
+                    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
                     result = subprocess.run(
                         ['git', 'remote', 'get-url', 'origin'],
                         cwd=item_path,
                         capture_output=True,
                         text=True,
                         errors='replace',
-                        timeout=10
+                        timeout=10,
+                        creationflags=CREATE_NO_WINDOW
                     )
                     
                     if result.returncode == 0:
@@ -2067,10 +2078,12 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     
                 # 如果仍然失败，可能是系统不支持，记录调试信息
                 if result != 0:
-                    print(f"[调试] 无法设置暗色标题栏，错误码: {result}")
+                    # 使用内部日志机制替代print，避免弹黑窗
+                    self._text_enqueue(f"[调试] 无法设置暗色标题栏，错误码: {result}")
                     
             except Exception as e:
-                print(f"[调试] 设置暗色标题栏失败: {e}")
+                # 使用内部日志机制替代print，避免弹黑窗
+                self._text_enqueue(f"[调试] 设置暗色标题栏失败: {e}")
                 pass  # 如果设置失败，不影响程序运行
 
     def _show_dark_warning(self, title, message, details=None):
@@ -2406,7 +2419,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         self.save_config()
 
     def select_python_environment(self):
-        path = self._ask_open_filename_dark(title="选择python.exe", filetypes=[("Python Executable", "python*.exe"), ("All files", "*.*")])
+        path = self._ask_open_filename_dark(title="选择python.exe", filetypes=[("Python Executable", "python.exe"), ("All files", "*.exe")])
         if path:
             if path not in self.python_paths:
                 self.python_paths.append(path)
@@ -2634,7 +2647,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         self._text_enqueue(f"[克隆] 开始：{plugin_name}")
         # ---- 检测 git 命令 ----
         try:
-            subprocess.run(["git", "--version"], capture_output=True, text=True, errors='replace', check=True)
+            subprocess.run(["git", "--version"], capture_output=True, text=True, errors='replace', check=True, creationflags=CREATE_NO_WINDOW)
         except Exception:
             self._text_enqueue("[克隆] 错误：未找到 git 命令，请安装 Git 并置于 PATH")
             return
@@ -3911,7 +3924,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             import subprocess
             
             cmd = [python_env, '-m', 'pip', 'list', '--format=json']
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, creationflags=CREATE_NO_WINDOW)
             if result.returncode == 0 and result.stdout:
                 packages = json.loads(result.stdout)
                 return {pkg['name']: pkg['version'] for pkg in packages}
@@ -3934,7 +3947,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 cmd.extend(['--trusted-host', host])
                 cmd.extend(['--extra-index-url', 'https://pypi.org/simple'])
                 cmd.extend(['--trusted-host', 'pypi.org'])
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, creationflags=CREATE_NO_WINDOW)
             success = result.returncode == 0
             if success:
                 return True, ''
@@ -4129,7 +4142,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 return
             def run_git(args):
                 try:
-                    r = subprocess.run(['git','-C',repo_path]+args, capture_output=True, text=True, errors='replace', timeout=20)
+                    r = subprocess.run(['git','-C',repo_path]+args, capture_output=True, text=True, errors='replace', timeout=20, creationflags=CREATE_NO_WINDOW)
                     return r.returncode, (r.stdout or '').strip(), (r.stderr or '').strip()
                 except Exception as e:
                     return 1, '', str(e)
@@ -4204,11 +4217,11 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 return
             
             # 获取分支信息
-            r2 = subprocess.run(['git','-C',repo_path,'rev-parse','--abbrev-ref','HEAD'], capture_output=True, text=True, errors='replace', timeout=10)
+            r2 = subprocess.run(['git','-C',repo_path,'rev-parse','--abbrev-ref','HEAD'], capture_output=True, text=True, errors='replace', timeout=10, creationflags=CREATE_NO_WINDOW)
             branch = (r2.stdout or '').strip()
             
             # 获取HEAD哈希
-            r3 = subprocess.run(['git','-C',repo_path,'rev-parse','HEAD'], capture_output=True, text=True, errors='replace', timeout=10)
+            r3 = subprocess.run(['git','-C',repo_path,'rev-parse','HEAD'], capture_output=True, text=True, errors='replace', timeout=10, creationflags=CREATE_NO_WINDOW)
             head = (r3.stdout or '').strip()
             
             # 检查是否是新初始化的仓库（没有任何提交）
@@ -4217,7 +4230,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 return
             
             # 获取标签信息
-            r1 = subprocess.run(['git','-C',repo_path,'describe','--tags','--abbrev=0'], capture_output=True, text=True, errors='replace', timeout=10)
+            r1 = subprocess.run(['git','-C',repo_path,'describe','--tags','--abbrev=0'], capture_output=True, text=True, errors='replace', timeout=10, creationflags=CREATE_NO_WINDOW)
             tag = (r1.stdout or '').strip()
             
             # 构建显示信息
@@ -4301,21 +4314,21 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                         return
                     
                     # 执行git status命令检查仓库状态
-                    status_result = subprocess.run(['git','-C',repo,'status'], capture_output=True, text=True, errors='replace')
+                    status_result = subprocess.run(['git','-C',repo,'status'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                     self._text_enqueue(f"[版本维护] 📋 Git状态: {status_result.stdout[:100]}...")
                     
                     # 获取远程仓库地址
-                    remote = (subprocess.run(['git','-C',repo,'remote','get-url','origin'], capture_output=True, text=True, errors='replace').stdout or '').strip()
+                    remote = (subprocess.run(['git','-C',repo,'remote','get-url','origin'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                     
                     # 获取分支信息
-                    branch = (subprocess.run(['git','-C',repo,'rev-parse','--abbrev-ref','HEAD'], capture_output=True, text=True, errors='replace').stdout or '').strip()
+                    branch = (subprocess.run(['git','-C',repo,'rev-parse','--abbrev-ref','HEAD'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                     
                     # 获取HEAD哈希
-                    head_result = subprocess.run(['git','-C',repo,'rev-parse','HEAD'], capture_output=True, text=True, errors='replace')
+                    head_result = subprocess.run(['git','-C',repo,'rev-parse','HEAD'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                     head = (head_result.stdout or '').strip()
                     
                     # 获取版本描述
-                    describe_result = subprocess.run(['git','-C',repo,'describe','--tags','--always'], capture_output=True, text=True, errors='replace')
+                    describe_result = subprocess.run(['git','-C',repo,'describe','--tags','--always'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                     describe = (describe_result.stdout or '').strip()
                     
                     # 处理detached HEAD状态
@@ -4345,7 +4358,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     # 处理HEAD获取异常的情况
                     if head == 'HEAD' or not head:
                         # 尝试使用log命令获取实际的HEAD哈希
-                        log_result = subprocess.run(['git','-C',repo,'log','--oneline','-1'], capture_output=True, text=True, errors='replace')
+                        log_result = subprocess.run(['git','-C',repo,'log','--oneline','-1'], capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                         log_line = (log_result.stdout or '').strip()
                         self._text_enqueue(f"[版本维护] ⚠️ HEAD获取异常，尝试使用log命令获取: '{log_line}'")
                         if log_line:
@@ -4388,7 +4401,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             # 移除重复的info_frame和tabs创建代码
   
             def run_git(args):
-                return subprocess.run(['git','-C',repo]+args, capture_output=True, text=True, errors='replace')
+                return subprocess.run(['git','-C',repo]+args, capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
 
             def build_table(container, rows, current_ref_is_tag=False, max_rows=30, describe_var=None):
                 try:
@@ -4489,7 +4502,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                                     def run_git_cmd(args):
                                         try:
                                             # 使用从comfy_dir_var获取的路径，确保与用户选择一致
-                                            result = subprocess.run(['git','-C',self.comfy_dir_var.get()]+args, capture_output=True, text=True, errors='replace', timeout=30)
+                                            result = subprocess.run(['git','-C',self.comfy_dir_var.get()]+args, capture_output=True, text=True, errors='replace', timeout=30, creationflags=CREATE_NO_WINDOW)
                                             return result
                                         except Exception as e:
                                             # 创建一个模拟的CompletedProcess对象
@@ -4596,7 +4609,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                                                 cmd = [python_exe, '-m', 'pip', 'install', '-r', req_file]
                                                 
                                                 # 使用实时输出捕获，显示详细安装过程
-                                                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+                                                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                                                 
                                                 output_lines = []
                                                 while True:
@@ -4683,7 +4696,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     def get_current_describe():
                         try:
                             return (subprocess.run(['git','-C',repo,'describe','--tags','--always'], 
-                                                   capture_output=True, text=True, errors='replace', timeout=15).stdout or '').strip()
+                                                   capture_output=True, text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                         except Exception:
                             return ''  # 如果获取失败，使用空字符串
                     
@@ -4691,7 +4704,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     # 同时获取当前分支信息
                     try:
                         branch = (subprocess.run(['git','-C',repo,'rev-parse','--abbrev-ref','HEAD'], 
-                                               capture_output=True, text=True, errors='replace').stdout or '').strip()
+                                               capture_output=True, text=True, errors='replace', creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                         # 更新显示当前版本的变量
                         branch_var.set(f"📝 当前分支: {branch or '未知'}    🔖 当前版本: {describe or '未知'}")
                     except Exception:
@@ -4806,7 +4819,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                                 self._text_enqueue(f"[版本维护] 正在处理标签 {i+1}/{len(tags)}...")
                             
                             info = (subprocess.run(['git','-C',repo,'show','-s','--format=%h;%ad;%s','--date=short',t], 
-                                                  capture_output=True, text=True, errors='replace', timeout=15).stdout or '').strip()
+                                                  capture_output=True, text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                             parts = (info or '; ; ').split(';')
                             rid = parts[0].strip()
                             date = parts[1].strip()
@@ -4885,7 +4898,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     def get_current_describe():
                         try:
                             return (subprocess.run(['git','-C',repo,'describe','--tags','--always'], 
-                                                   capture_output=True, text=True, errors='replace', timeout=15).stdout or '').strip()
+                                                   capture_output=True, text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                         except Exception:
                             return ''  # 如果获取失败，使用空字符串
                     
@@ -4950,7 +4963,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                                 status_var.set(f"📋 正在刷新标签 {i+1}/{len(tags)}...")
                             
                             info = (subprocess.run(['git','-C',repo,'show','-s','--format=%h;%ad;%s','--date=short',t], 
-                                                  capture_output=True, text=True, errors='replace', timeout=15).stdout or '').strip()
+                                                  capture_output=True, text=True, errors='replace', timeout=15, creationflags=CREATE_NO_WINDOW).stdout or '').strip()
                             parts = (info or '; ; ').split(';')
                             rid = parts[0].strip()
                             date = parts[1].strip()
@@ -5058,7 +5071,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 cmd = list(args)
                 if skip_self:
                     cmd.append('--skip_self_update')
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
                 while True:
                     try:
                         line = proc.stdout.readline()
