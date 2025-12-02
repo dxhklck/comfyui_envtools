@@ -290,7 +290,7 @@ class ComfyVenvTools:
             host = mirror_url.split('/')[2]
             cmd += ['-i', mirror_url, '--trusted-host', host]
         try:
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=180)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=180, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or '').strip()
             if proc.returncode == 0:
                 return f"[模拟安装] 仅针对未安装依赖成功\n\n{out[:1800]}"
@@ -879,7 +879,7 @@ class ComfyVenvTools:
             cmd += ['-i', mirror_url, '--trusted-host', host]
         try:
             # 使用实时输出捕获，提供更好的安装过程反馈
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             
             output_lines = []
             collected_packages = []
@@ -958,7 +958,7 @@ class ComfyVenvTools:
         self._last_python_exe = python_exe or self._last_python_exe
         py = python_exe or 'python'
         try:
-            proc = subprocess.run([py, '-m', 'pip', 'uninstall', name, '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace')
+            proc = subprocess.run([py, '-m', 'pip', 'uninstall', name, '-y'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or '') + ("\n" + proc.stderr if proc.stderr else '')
             if proc.returncode == 0:
                 return f"删除成功：{name}\n\n{out[:1800]}"
@@ -978,7 +978,7 @@ class ComfyVenvTools:
             # 使用实时输出捕获，提供更好的安装过程反馈
             proc = subprocess.Popen([py, '-m', 'pip', 'install', whl_path], 
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                  text=True, errors='replace')
+                                  text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             
             output_lines = []
             
@@ -1027,7 +1027,7 @@ class ComfyVenvTools:
         src_name = os.path.basename(src_path)
         try:
             # 使用实时输出捕获，提供更好的安装过程反馈
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             
             output_lines = []
             
@@ -1064,7 +1064,7 @@ class ComfyVenvTools:
     # ---------------------- CMD 执行 ----------------------
     def execute_command(self, cmd: str) -> str:
         try:
-            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace')
+            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', creationflags=CREATE_NO_WINDOW)
             out, err = proc.communicate(timeout=60)
             return out or err or "(无输出)"
         except Exception as e:
@@ -1523,7 +1523,7 @@ class ComfyVenvTools:
                     
             # 如果JSON格式失败，回退到文本格式
             cmd = [python_exe, '-m', 'pip', 'list']
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30)
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30, creationflags=CREATE_NO_WINDOW)
             
             if proc.returncode == 0 and proc.stdout:
                 package_names = set()

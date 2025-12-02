@@ -3,7 +3,7 @@ import json
 import sys
 import time
 import subprocess
-import sys
+import webbrowser
 
 # 全局版本号定义
 APP_VERSION = "ver2.5.1"
@@ -29,8 +29,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title(f"ComfyUI中Python环境维护小工具 {APP_VERSION} 练老师 QQ群: 723799422")
-        self.geometry("1100x650")
-        self.minsize(1000, 600)
+        self.geometry("1100x670")
+        self.minsize(1000, 620)
 
         # 关闭标志，用于优雅退出
         self._closing = False
@@ -97,13 +97,22 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         self.main = ctk.CTkFrame(self)
         self.main.pack(fill='both', expand=True, padx=2, pady=2)
 
+        # 添加顶部工具栏
+        self.toolbar = ctk.CTkFrame(self.main)
+        self.toolbar.pack(fill='x', side='top', padx=2, pady=2)
+
+        # 右侧放置帮助和关于按钮
+        self.help_button = ctk.CTkButton(self.toolbar, text="📖 帮助", command=self.show_help_document, width=50)
+        self.help_button.pack(side='right', padx=2)
+        
+        self.about_button = ctk.CTkButton(self.toolbar, text="📋 关于", command=self.show_about, width=50)
+        self.about_button.pack(side='right', padx=2)
+
         try:
             if not hasattr(self, 'mirror_var') or self.mirror_var is None:
                 self.mirror_var = ctk.StringVar(value=self.selected_mirror)
         except Exception:
             self.mirror_var = ctk.StringVar(value=self.selected_mirror)
-
-        # 顶部工具栏已撤消，改回原区域内的版本维护设计
 
         self.paned = ctk.CTkFrame(self.main)
         self.paned.pack(fill='both', expand=True)
@@ -271,7 +280,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
 
     def _center_on_screen(self):
         """使用设计尺寸立即居中，避免绘制延迟"""
-        w, h = 1100, 650
+        w, h = 1100, 670
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         x = (sw - w) // 2
@@ -5211,6 +5220,75 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         except Exception as e:
             self.update_result_text(f"[版本维护] 启动失败: {e}")
 
+    def show_about(self):
+        """显示关于窗口，包含应用信息和GitHub URL"""
+        
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("关于 ComfyUI 环境维护小工具")
+        dialog.geometry("450x270")
+        dialog.transient(self)
+        dialog.grab_set()
+        
+        # 设置暗色标题栏
+        self._set_dark_titlebar(dialog)
+        
+        # 居中显示
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # 主容器
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # 应用图标和标题 - 居中显示
+        ctk.CTkLabel(main_frame, text="📋 ComfyUI 环境维护小工具", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+        
+        # 版本信息 - 居中显示
+        ctk.CTkLabel(main_frame, text=f"版本: {APP_VERSION}", text_color="white", justify="center", 
+                    font=ctk.CTkFont(size=12)).pack(pady=5)
+        
+        # 作者信息 - 居中显示
+        ctk.CTkLabel(main_frame, text="作者: 练老师", text_color="white", justify="center", 
+                    font=ctk.CTkFont(size=12)).pack(pady=5)
+        
+        # QQ群信息 - 居中显示
+        ctk.CTkLabel(main_frame, text="QQ群: 723799422", text_color="white", justify="center", 
+                    font=ctk.CTkFont(size=12)).pack(pady=5)
+        
+        # GitHub URL - 居中显示
+        ctk.CTkLabel(main_frame, text="GitHub地址:", text_color="white", justify="center", 
+                    font=ctk.CTkFont(size=12)).pack(pady=5)
+        
+        # 可点击的GitHub链接 - 居中显示
+        def open_github():
+            webbrowser.open("https://github.com/dxhklck/comfyui_envtools")
+        
+        github_label = ctk.CTkLabel(main_frame, 
+                                   text="https://github.com/dxhklck/comfyui_envtools", 
+                                   text_color="#0080ff", 
+                                   font=ctk.CTkFont(size=12, underline=True), 
+                                   cursor="hand2")
+        github_label.pack(pady=2, padx=30)
+        github_label.bind("<Button-1>", lambda e: open_github())
+        
+        # 等待对话框关闭
+        self.wait_window(dialog)
+
+    def show_help_document(self):
+        """显示帮助文档，直接使用浏览器打开HTML文件"""
+        
+        # 获取help_document.html文件路径
+        help_file_path = os.path.join(os.getcwd(), "help_document.html")
+        
+        # 检查文件是否存在
+        if not os.path.exists(help_file_path):
+            self._show_dark_warning("文件不存在", f"帮助文档文件未找到: {help_file_path}")
+            return
+        
+        # 直接使用默认浏览器打开HTML文件
+        webbrowser.open(help_file_path)
 
 if __name__ == '__main__':
     app = ComfyUIEnvironmentManager()

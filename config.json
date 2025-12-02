@@ -11,6 +11,10 @@
   ],
   "plugin_history": [],
   "lib_history": [
+    "num2words",
+    "audiocraft",
+    "hydra-colorlog",
+    "typing",
     "flashy",
     "encodec",
     "demucs",
