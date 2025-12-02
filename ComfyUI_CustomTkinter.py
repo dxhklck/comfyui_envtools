@@ -6,7 +6,7 @@ import subprocess
 import webbrowser
 
 # 全局版本号定义
-APP_VERSION = "ver2.5.1"
+APP_VERSION = "ver2.5.2"
 
 # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
 if sys.platform == 'win32':
