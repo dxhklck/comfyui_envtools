@@ -2508,9 +2508,6 @@ class ComfyUIEnvironmentManager(ctk.CTk):
     # ---------------- 镜像测速逻辑 ----------------
     def _on_mirror_dropdown_click(self, _=None):
         # 点击下拉框时触发一次测速（子线程），并自动应用最快国内源
-        if not self.python_exe_path:
-            self._show_dark_warning("⚠️ 输入验证", "未选择Python环境，请先选择一个有效的Python环境")
-            return
         try:
             self.progress_bar.pack(fill='x', pady=(8, 0))
         except Exception:
@@ -2555,7 +2552,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                         start = _t.time()
                         host = url.split('/')[2]
                         cmd = [self.python_exe_path or 'python', '-m', 'pip', 'install', '--dry-run', 'pip', '--index-url', url, '--trusted-host', host]
-                        proc = __import__('subprocess').run(cmd, stdout=__import__('subprocess').PIPE, stderr=__import__('subprocess').STDOUT, text=True, errors='replace', timeout=20)
+                        proc = __import__('subprocess').run(cmd, stdout=__import__('subprocess').PIPE, stderr=__import__('subprocess').STDOUT, text=True, errors='replace', timeout=20, creationflags=CREATE_NO_WINDOW)
                         elapsed = _t.time() - start
                         if proc.returncode == 0:
                             results.append((name, elapsed))
@@ -3536,6 +3533,10 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         Thread(target=_task).start()
 
     def find_conflicting_libraries(self):
+        # 检查是否有可用的Python环境
+        if not self.python_exe_path:
+            self._show_dark_warning("⚠️ 输入验证", "未选择Python环境，请先选择一个有效的Python环境")
+            return
         Thread(target=lambda: self.update_result_text(self.tools.find_conflicts())).start()
 
     def start_environment_migration(self):

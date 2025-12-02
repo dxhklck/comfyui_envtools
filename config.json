@@ -1,23 +1,13 @@
 {
-  "python_paths": [
-    "F:\\kontext\\python_embeded\\python.exe",
-    "E:\\kontext\\python_embeded\\python.exe"
-  ],
-  "current_python_exe": "F:\\kontext\\python_embeded\\python.exe",
+  "python_paths": [],
+  "current_python_exe": "",
   "fastest_mirror": "阿里云",
-  "custom_nodes_dir": "F:\\kontext\\ComfyUI\\custom_nodes",
+  "custom_nodes_dir": "",
   "requirements_cache": [],
-  "custom_nodes_history": [
-    "F:\\kontext\\ComfyUI\\custom_nodes",
-    "E:\\kontext\\ComfyUI\\custom_nodes"
-  ],
+  "custom_nodes_history": [],
   "plugin_history": [],
   "lib_history": [],
   "cmd_history": [],
   "comfy_paths_history": [],
-  "_missing_cache": {
-    "F:\\kontext\\ComfyUI\\custom_nodes": [
-      "F:\\kontext\\ComfyUI\\custom_nodes\\ComfyUI-SDPose-OOD\\requirements.txt"
-    ]
-  }
+  "_missing_cache": {}
 }
