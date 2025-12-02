@@ -529,16 +529,48 @@ class ComfyVenvTools:
         """运行 pip check 输出冲突信息。"""
         py = self._last_python_exe or 'python'
         try:
+            self.log("[冲突检查] 正在检查依赖冲突...")
             proc = subprocess.run([py, '-m', 'pip', 'check'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=60, creationflags=CREATE_NO_WINDOW)
             out = (proc.stdout or proc.stderr or '').strip()
+            
+            # 英文到中文的翻译映射
+            translations = {
+                'requires': '需要',
+                'which is not installed': '但该包未安装',
+                'has requirement': '需要依赖',
+                'but you have': '但您已安装',
+                'Conflicting requirements': '依赖冲突',
+                'No broken requirements found.': '未发现损坏的依赖。'
+            }
+            
+            # 翻译输出内容
+            translated_out = out
+            for en, zh in translations.items():
+                translated_out = translated_out.replace(en, zh)
+            
             if proc.returncode == 0:
-                return out or "[冲突检查] 未发现依赖冲突"
+                return "[冲突检查] ✅ 未发现依赖冲突\n\n所有安装的包依赖关系正常，没有冲突问题。"
             else:
-                return f"[冲突检查] 返回码{proc.returncode}\n\n{out[:1800]}"
+                # 美化输出，添加友好提示
+                lines = translated_out.split('\n')
+                conflict_count = 0
+                friendly_output = "[冲突检查] ❌ 发现依赖冲突\n\n"
+                friendly_output += "📋 冲突详情：\n"
+                
+                for line in lines:
+                    if line:
+                        conflict_count += 1
+                        friendly_output += f"  {conflict_count}. {line}\n"
+                
+                friendly_output += "\n💡 解决建议：\n"
+                friendly_output += "  1. 根据冲突信息，如果不可调和，可以尝试卸载不重要的冲突的包\n"
+                friendly_output += "  2. 使用精确查找库名称，升级、降级冲突包的版本号达到两者间的一个平衡点\n"
+                
+                return friendly_output[:2000]  # 限制输出长度，避免过长
         except subprocess.TimeoutExpired:
-            return "[冲突检查] 超时"
+            return "[冲突检查] ⏱️  检查超时\n\n依赖冲突检查耗时过长，请稍后重试或手动检查。"
         except Exception as e:
-            return f"[冲突检查] 执行异常: {e}"
+            return f"[冲突检查] 🚫 执行异常: {e}\n\n检查依赖冲突时发生错误，请确保Python环境配置正确。"
 
     # 与旧前端命名保持兼容的别名
     def find_conflicting_libraries(self) -> str:
@@ -746,11 +778,9 @@ class ComfyVenvTools:
                         if version_part:
                             versions = [v.strip() for v in version_part.split(',') if v.strip()]
                             if versions:
-                                # 限制显示版本数量，避免过长
-                                display_versions = versions[:20]
+                                # 显示所有版本
+                                display_versions = versions
                                 msgs.append("可用版本：" + ', '.join(display_versions))
-                                if len(versions) > 20:
-                                    msgs.append(f"... 还有 {len(versions) - 20} 个版本")
                                 break
                 else:
                     # 如果没有找到标准格式，检查是否有其他版本信息

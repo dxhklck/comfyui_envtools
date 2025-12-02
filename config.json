@@ -11,11 +11,18 @@
   ],
   "plugin_history": [],
   "lib_history": [
-    "sage",
+    "flashy",
+    "encodec",
+    "demucs",
+    "demucs,",
     "numpy",
+    "nunpy",
+    "sage",
     "inference-exp"
   ],
   "cmd_history": [
+    "pip install --upgrade pip",
+    "E:\\kontext\\python_embeded\\python.exe -m pip install --upgrade pip",
     "dir"
   ],
   "comfy_paths_history": [

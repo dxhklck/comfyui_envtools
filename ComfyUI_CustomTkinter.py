@@ -266,7 +266,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
 
     def _build_right_panel(self):
         ctk.CTkLabel(self.right, text="执行结果", font=("Microsoft YaHei", 14, 'bold')).pack(fill='x', pady=(6, 4))
-        self.result_text = ctk.CTkTextbox(self.right, wrap='word')
+        self.result_text = ctk.CTkTextbox(self.right, wrap='word', font=ctk.CTkFont(size=12))
         self.result_text.pack(fill='both', expand=True, padx=2, pady=2)
 
     def _center_on_screen(self):
@@ -818,9 +818,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
     def _ask_directory_dark(self, title="选择目录", starting_dir=None):
         return self._create_dark_file_dialog(title=title, dialog_type="directory", filetypes=None, defaultextension=None, initialfile=None, starting_dir=starting_dir)
     
-    def _ask_open_filename_dark(self, title="选择文件", filetypes=None):
+    def _ask_open_filename_dark(self, title="选择文件", filetypes=None, starting_dir=None):
         """暗色调文件打开对话框"""
-        return self._create_dark_file_dialog(title=title, dialog_type="open", filetypes=filetypes)
+        return self._create_dark_file_dialog(title=title, dialog_type="open", filetypes=filetypes, starting_dir=starting_dir)
     
     def _ask_saveas_filename_dark(self, title="保存文件", filetypes=None, defaultextension=None, initialfile=None):
         """暗色调文件保存对话框"""
@@ -2951,9 +2951,12 @@ class ComfyUIEnvironmentManager(ctk.CTk):
 
     def manual_add_requirements(self):
         """手动浏览requirements.txt文件并追加到依赖列表"""
+        # 获取当前选择的第三方插件目录作为默认路径
+        starting_dir = self.custom_nodes_var.get() if self.custom_nodes_var.get() else None
         file_path = self._ask_open_filename_dark(
             title="选择requirements.txt文件",
-            filetypes=[("Requirements文件", "requirements*.txt"), ("文本文件", "*.txt"), ("所有文件", "*.*")]
+            filetypes=[("Requirements文件", "requirements*.txt"), ("文本文件", "*.txt"), ("所有文件", "*.*")],
+            starting_dir=starting_dir
         )
         
         if not file_path:
@@ -4142,9 +4145,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
     
     def _update_version_combo(self, versions):
         """更新版本下拉框的选项"""
-        # 限制版本数量，避免下拉框过长
-        max_versions = 20
-        display_versions = versions[:max_versions]
+        # 显示所有版本
+        display_versions = versions
         
         # 更新下拉框选项
         self.version_cb.configure(values=display_versions)
@@ -4154,10 +4156,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             self.version_var.set(display_versions[0])
         
         # 在状态栏显示版本数量信息
-        if len(versions) > max_versions:
-            self._text_enqueue(f"[库查找] 找到 {len(versions)} 个版本，显示前 {max_versions} 个")
-        else:
-            self._text_enqueue(f"[库查找] 找到 {len(versions)} 个可用版本")
+        self._text_enqueue(f"[库查找] 找到 {len(versions)} 个可用版本")
 
     def search_library_local(self):
         lib_name = self.lib_name_var.get().strip()
