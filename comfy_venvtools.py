@@ -1276,7 +1276,8 @@ class ComfyVenvTools:
                     cwd=plugin_dir, 
                     capture_output=True, 
                     text=True, 
-                    errors='replace'
+                    errors='replace',
+                    creationflags=CREATE_NO_WINDOW
                 )
                 current_commit = (result_current.stdout or '').strip() if result_current.returncode == 0 else ""
                 
@@ -1286,7 +1287,8 @@ class ComfyVenvTools:
                     cwd=plugin_dir, 
                     capture_output=True, 
                     text=True, 
-                    errors='replace'
+                    errors='replace',
+                    creationflags=CREATE_NO_WINDOW
                 )
                 
                 # 检查是否有更新
@@ -1295,7 +1297,8 @@ class ComfyVenvTools:
                     cwd=plugin_dir, 
                     capture_output=True, 
                     text=True, 
-                    errors='replace'
+                    errors='replace',
+                    creationflags=CREATE_NO_WINDOW
                 )
                 
                 has_update = False
@@ -1317,7 +1320,8 @@ class ComfyVenvTools:
                     cwd=plugin_dir, 
                     capture_output=True, 
                     text=True, 
-                    errors='replace'
+                    errors='replace',
+                    creationflags=CREATE_NO_WINDOW
                 )
                 latest_commit = (result_latest.stdout or '').strip() if result_latest.returncode == 0 else ""
                 

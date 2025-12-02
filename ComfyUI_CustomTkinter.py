@@ -2026,6 +2026,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         try:
             self._text_enqueue(f"[更新] 开始更新插件: {repo_name}")
             
+            # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
+            CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            
             # 执行git pull更新插件
             cmd = ["git", "pull"]
             proc = subprocess.Popen(cmd, cwd=plugin_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
