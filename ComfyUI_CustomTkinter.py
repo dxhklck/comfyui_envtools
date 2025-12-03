@@ -5279,8 +5279,17 @@ class ComfyUIEnvironmentManager(ctk.CTk):
     def show_help_document(self):
         """显示帮助文档，直接使用浏览器打开HTML文件"""
         
-        # 获取help_document.html文件路径
-        help_file_path = os.path.join(os.getcwd(), "help_document.html")
+        # 获取help_document.html文件路径，兼容开发环境和打包环境
+        import sys
+        # 检查是否为打包环境
+        if getattr(sys, 'frozen', False):
+            # 打包环境：使用exe所在目录
+            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+            help_file_path = os.path.join(exe_dir, "help_document.html")
+        else:
+            # 开发环境：使用脚本所在目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            help_file_path = os.path.join(script_dir, "help_document.html")
         
         # 检查文件是否存在
         if not os.path.exists(help_file_path):
