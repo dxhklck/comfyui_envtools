@@ -1856,7 +1856,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             ctk.CTkLabel(frame, text="请选择查找模式：", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=10)
             
             # 模式说明
-            mode_info = ctk.CTkTextbox(frame, height=80, width=350)
+            mode_info = ctk.CTkTextbox(frame, height=80, width=350, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             mode_info.pack(pady=10)
             mode_info.insert('1.0', "精确查找：完全匹配库名（如输入'torch'只匹配'torch'）\n\n模糊查找：部分匹配库名（如输入'torch'可匹配'torch','pytorch','torchvision'等）")
             mode_info.configure(state='disabled')
@@ -2372,7 +2372,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
         ctk.CTkLabel(icon_frame, text="ℹ️", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
-        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
+        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(side='left')
         
         # 消息文本
         ctk.CTkLabel(main_frame, text=message, text_color="white", justify="left", 
@@ -4385,8 +4385,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             branch_var = tk.StringVar(value="📝 当前分支: 正在获取...    🔖 当前版本: 正在获取...")
             repo_var = tk.StringVar(value=f"📁 ComfyUI目录: {repo}")
             
-            ctk.CTkLabel(info_frame, textvariable=remote_var, anchor='w').pack(anchor='w')
-            ctk.CTkLabel(info_frame, textvariable=branch_var, anchor='w').pack(anchor='w')
+            ctk.CTkLabel(info_frame, textvariable=remote_var, anchor='w', font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(anchor='w')
+            ctk.CTkLabel(info_frame, textvariable=branch_var, anchor='w', font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(anchor='w')
             ctk.CTkLabel(info_frame, textvariable=repo_var, anchor='w', text_color='white', font=('Microsoft YaHei', 14)).pack(anchor='w')
             
 
@@ -4556,7 +4556,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     # 如果框架创建失败，使用更简单的后备方案
                     status_var.set(f"⚠️ UI初始化异常: {frame_error}")
                     # 创建一个简单的标签显示错误信息
-                    error_label = ctk.CTkLabel(container, text=f"UI初始化失败: {frame_error}", text_color="red")
+                    error_label = ctk.CTkLabel(container, text=f"UI初始化失败: {frame_error}", text_color="red", font=ctk.CTkFont(family="Microsoft YaHei", size=12))
                     error_label.pack(fill='both', expand=True, pady=20)
                     return
                 
@@ -4572,10 +4572,10 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 # 创建表头 - 放在内部滚动框架中
                 header = ctk.CTkFrame(inner_scroll)
                 header.pack(fill='x', pady=(0,2))  # 减少间距
-                ctk.CTkLabel(header, text="🔢 版本ID", width=100).pack(side='left', padx=2)  # 减少宽度
-                ctk.CTkLabel(header, text="📝 更新内容", width=300).pack(side='left', padx=2)  # 减少宽度
-                ctk.CTkLabel(header, text="📅 日期", width=80).pack(side='left', padx=2)  # 减少宽度
-                ctk.CTkLabel(header, text="🎯 选择", width=60).pack(side='left', padx=2)  # 减少宽度
+                ctk.CTkLabel(header, text="🔢 版本ID", width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)  # 减少宽度
+                ctk.CTkLabel(header, text="📝 更新内容", width=300, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)  # 减少宽度
+                ctk.CTkLabel(header, text="📅 日期", width=80, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)  # 减少宽度
+                ctk.CTkLabel(header, text="🎯 选择", width=60, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)  # 减少宽度
                 
                 # 批量创建行，减少UI更新次数
                 row_frames = []
@@ -4769,7 +4769,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                         return on_select_radio
                     
                     # 所有radio button共享同一个变量，确保单选行为
-                    rb = ctk.CTkRadioButton(row, text='', variable=selected_var, value=ref, command=make_radio_command(ref, row))
+                    rb = ctk.CTkRadioButton(row, text='', variable=selected_var, value=ref, command=make_radio_command(ref, row), font=ctk.CTkFont(family="Microsoft YaHei", size=12))
                     rb.pack(side='left', padx=2)
                     radio_buttons.append(rb)
                     
@@ -4786,7 +4786,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                             pass
 
             status_var = tk.StringVar(value="⏳ 正在初始化版本管理界面...")
-            info_label = ctk.CTkLabel(main, textvariable=status_var, anchor='w', justify='left')
+            info_label = ctk.CTkLabel(main, textvariable=status_var, anchor='w', justify='left', font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             info_label.pack(fill='x', pady=(4,0), padx=2)
             
             # 异步加载版本列表
@@ -5122,13 +5122,13 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             # 创建底部按钮区域
             btns = ctk.CTkFrame(main)
             btns.pack(fill='x', pady=8)
-            ctk.CTkLabel(btns, text="💡 提示：选择单选项将立即切换版本并自动安装依赖，过程可能因网络延迟稍有等待。", text_color="white").pack(side='left', padx=6)
+            ctk.CTkLabel(btns, text="💡 提示：选择单选项将立即切换版本并自动安装依赖，过程可能因网络延迟稍有等待。", text_color="white", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=6)
             
             # 创建显示数量控制区域
             count_frame = ctk.CTkFrame(btns)
             count_frame.pack(side='right', padx=4)
-            ctk.CTkLabel(count_frame, text="显示数量:", width=60).pack(side='left', padx=2)
-            count_entry = ctk.CTkEntry(count_frame, textvariable=display_count_var, width=60, justify='center')
+            ctk.CTkLabel(count_frame, text="显示数量:", width=60, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+            count_entry = ctk.CTkEntry(count_frame, textvariable=display_count_var, width=60, justify='center', font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             count_entry.pack(side='left', padx=2)
             
             # 刷新和关闭按钮
