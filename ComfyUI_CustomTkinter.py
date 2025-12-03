@@ -24,6 +24,8 @@ import shutil
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+# 设置默认字体为yahei - 使用CTkFont类的默认配置
+# 注意：customtkinter会自动应用到所有组件
 
 class ComfyUIEnvironmentManager(ctk.CTk):
     def __init__(self):
@@ -275,7 +277,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
 
     def _build_right_panel(self):
         ctk.CTkLabel(self.right, text="执行结果", font=("Microsoft YaHei", 14, 'bold')).pack(fill='x', pady=(6, 4))
-        self.result_text = ctk.CTkTextbox(self.right, wrap='word', font=ctk.CTkFont(size=12))
+        self.result_text = ctk.CTkTextbox(self.right, wrap='word', font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.result_text.pack(fill='both', expand=True, padx=2, pady=2)
 
     def _center_on_screen(self):
@@ -581,7 +583,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             main_frame = ctk.CTkFrame(input_dialog)
             main_frame.pack(fill='both', expand=True, padx=15, pady=15)
             
-            ctk.CTkLabel(main_frame, text="请输入新目录名称:", font=ctk.CTkFont(size=12, weight="bold")).pack(pady=5)
+            ctk.CTkLabel(main_frame, text="请输入新目录名称:", font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold")).pack(pady=5)
             
             dir_name_var = ctk.StringVar()
             name_entry = ctk.CTkEntry(main_frame, textvariable=dir_name_var, width=250)
@@ -1851,7 +1853,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             frame = ctk.CTkFrame(dialog)
             frame.pack(fill='both', expand=True, padx=25, pady=25)
             
-            ctk.CTkLabel(frame, text="请选择查找模式：", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+            ctk.CTkLabel(frame, text="请选择查找模式：", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=10)
             
             # 模式说明
             mode_info = ctk.CTkTextbox(frame, height=80, width=350)
@@ -2189,12 +2191,12 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         # 警告图标和标题
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
-        ctk.CTkLabel(icon_frame, text="⚠️", font=ctk.CTkFont(size=24)).pack(side='left', padx=(0, 10))
-        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
+        ctk.CTkLabel(icon_frame, text="⚠️", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
+        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(side='left')
         
         # 消息文本
         ctk.CTkLabel(main_frame, text=message, text_color="white", justify="left", 
-                    font=ctk.CTkFont(size=12)).pack(pady=8, padx=10, anchor='w')
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10, anchor='w')
         
         # 详细信息（如果有）
         if details:
@@ -2202,7 +2204,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             details_frame.pack(fill='both', expand=True, padx=10, pady=10)
             
             # 创建可滚动的文本框
-            text_box = ctk.CTkTextbox(details_frame, height=80, font=ctk.CTkFont(size=10))
+            text_box = ctk.CTkTextbox(details_frame, height=80, font=ctk.CTkFont(family="Microsoft YaHei", size=10))
             text_box.pack(fill='both', expand=True, padx=10, pady=10)
             text_box.insert('1.0', details)
             text_box.configure(state='disabled')
@@ -2215,7 +2217,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.destroy()
         
         ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100, 
-                     font=ctk.CTkFont(size=12)).pack()
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack()
         
         # 等待对话框关闭
         self.wait_window(dialog)
@@ -2310,9 +2312,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
-        ctk.CTkLabel(icon_frame, text="❓", font=ctk.CTkFont(size=24)).pack(side='left', padx=(0, 10))
+        ctk.CTkLabel(icon_frame, text="❓", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
         ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
-        msg_box = ctk.CTkTextbox(main_frame, font=ctk.CTkFont(size=12))
+        msg_box = ctk.CTkTextbox(main_frame, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         msg_box.pack(fill='both', expand=True, padx=10, pady=10)
         msg_box.insert('1.0', message)
         msg_box.configure(state='disabled')
@@ -2369,7 +2371,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         # 信息图标和标题
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
-        ctk.CTkLabel(icon_frame, text="ℹ️", font=ctk.CTkFont(size=24)).pack(side='left', padx=(0, 10))
+        ctk.CTkLabel(icon_frame, text="ℹ️", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
         ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
         
         # 消息文本
@@ -2422,7 +2424,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         main_frame.pack(fill='both', expand=True, padx=20, pady=20)
         
         # 标题
-        ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 15))
+        ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=(0, 15))
         
         # 提示文本
         ctk.CTkLabel(main_frame, text=prompt, text_color="white", justify="left", 
@@ -3602,8 +3604,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             # 图标和标题
             title_frame = ctk.CTkFrame(main_frame)
             title_frame.pack(fill='x', pady=(0, 15))
-            ctk.CTkLabel(title_frame, text="⚠️", font=ctk.CTkFont(size=24)).pack(side='left', padx=(0, 10))
-            ctk.CTkLabel(title_frame, text="需要更多Python环境", font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
+            ctk.CTkLabel(title_frame, text="⚠️", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
+            ctk.CTkLabel(title_frame, text="需要更多Python环境", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(side='left')
             
             # 说明文本
             info_frame = ctk.CTkFrame(main_frame)
@@ -3673,7 +3675,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.geometry(f"+{x}+{y}")
             
             # 标题
-            ctk.CTkLabel(dialog, text="请选择环境迁移方式：", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=20)
+            ctk.CTkLabel(dialog, text="请选择环境迁移方式：", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=20)
             
             # 迁移模式变量
             migration_mode = ctk.StringVar(value="env_to_env" if has_multiple_envs else "snapshot")
@@ -3777,7 +3779,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             main_frame.pack(fill='both', expand=True, padx=20, pady=20)
             
             # 标题
-            ctk.CTkLabel(main_frame, text="选择源环境和目标环境", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 15))
+            ctk.CTkLabel(main_frame, text="选择源环境和目标环境", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=(0, 15))
             
             # 源环境选择
             source_frame = ctk.CTkFrame(main_frame)
@@ -4385,7 +4387,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             
             ctk.CTkLabel(info_frame, textvariable=remote_var, anchor='w').pack(anchor='w')
             ctk.CTkLabel(info_frame, textvariable=branch_var, anchor='w').pack(anchor='w')
-            ctk.CTkLabel(info_frame, textvariable=repo_var, anchor='w', text_color='white', font=('', 14)).pack(anchor='w')
+            ctk.CTkLabel(info_frame, textvariable=repo_var, anchor='w', text_color='white', font=('Microsoft YaHei', 14)).pack(anchor='w')
             
 
 
@@ -4565,7 +4567,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     info_frame = ctk.CTkFrame(inner_scroll)
                     info_frame.pack(fill='x', pady=(0,5))
                     ctk.CTkLabel(info_frame, text=f"ℹ️ 显示前 {max_rows} 个版本，共 {len(rows)} 个版本", 
-                                text_color="gray", font=('', 9)).pack(side='left', padx=5)
+                                text_color="gray", font=('Microsoft YaHei', 9)).pack(side='left', padx=5)
                 
                 # 创建表头 - 放在内部滚动框架中
                 header = ctk.CTkFrame(inner_scroll)
@@ -4583,9 +4585,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                     row_frames.append(row)
                     
                     # 使用更简洁的标签
-                    ctk.CTkLabel(row, text=rid[:8], width=100, anchor='w', font=('', 10)).pack(side='left', padx=2)  # 限制长度和字体大小
-                    ctk.CTkLabel(row, text=msg[:40] + ('...' if len(msg) > 40 else ''), width=300, anchor='w', font=('', 10)).pack(side='left', padx=2)  # 截断长文本
-                    ctk.CTkLabel(row, text=date, width=80, anchor='w', font=('', 10)).pack(side='left', padx=2)
+                    ctk.CTkLabel(row, text=rid[:8], width=100, anchor='w', font=('Microsoft YaHei', 10)).pack(side='left', padx=2)  # 限制长度和字体大小
+                    ctk.CTkLabel(row, text=msg[:40] + ('...' if len(msg) > 40 else ''), width=300, anchor='w', font=('Microsoft YaHei', 10)).pack(side='left', padx=2)  # 截断长文本
+                    ctk.CTkLabel(row, text=date, width=80, anchor='w', font=('Microsoft YaHei', 10)).pack(side='left', padx=2)
                     
                     def make_radio_command(r, row_frame):
                         def on_select_radio():
@@ -5241,7 +5243,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         main_frame.pack(fill='both', expand=True, padx=20, pady=20)
         
         # 应用图标和标题 - 居中显示
-        ctk.CTkLabel(main_frame, text="📋 ComfyUI 环境维护小工具", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+        ctk.CTkLabel(main_frame, text="📋 ComfyUI 环境维护小工具", font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(pady=10)
         
         # 版本信息 - 居中显示
         ctk.CTkLabel(main_frame, text=f"版本: {APP_VERSION}", text_color="white", justify="center", 
@@ -5299,7 +5301,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
         
         # 创建多行文本框，用于显示帮助文档内容
-        text_box = ctk.CTkTextbox(main_frame, wrap='word', font=ctk.CTkFont(size=12))
+        text_box = ctk.CTkTextbox(main_frame, wrap='word', font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         text_box.pack(fill='both', expand=True, padx=5, pady=5)
         
         # 帮助文档内容 - 纯文本格式，不使用Markdown语法
