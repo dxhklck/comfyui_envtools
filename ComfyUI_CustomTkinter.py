@@ -6,7 +6,7 @@ import subprocess
 import webbrowser
 
 # 全局版本号定义
-APP_VERSION = "ver2.5.2"
+APP_VERSION = "ver2.5.3"
 
 # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
 if sys.platform == 'win32':
@@ -104,10 +104,10 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         self.toolbar.pack(fill='x', side='top', padx=2, pady=2)
 
         # 右侧放置帮助和关于按钮
-        self.help_button = ctk.CTkButton(self.toolbar, text="📖 帮助", command=self.show_help_document, width=50)
+        self.help_button = ctk.CTkButton(self.toolbar, text="📖 帮助", command=self.show_help_document, width=50, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.help_button.pack(side='right', padx=2)
         
-        self.about_button = ctk.CTkButton(self.toolbar, text="📋 关于", command=self.show_about, width=50)
+        self.about_button = ctk.CTkButton(self.toolbar, text="📋 关于", command=self.show_about, width=50, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.about_button.pack(side='right', padx=2)
 
         try:
@@ -148,53 +148,53 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         # 1 国内源和Python环境（合并为单行，更紧凑）
         sec1 = self._section(self.left, "国内源和Python环境")
         r1 = ctk.CTkFrame(sec1); r1.pack(fill='x', padx=2, pady=3)
-        ctk.CTkLabel(r1, text="镜像:").pack(side='left', padx=2)
+        ctk.CTkLabel(r1, text="镜像:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
         self.mirror_var = ctk.StringVar(value=self.selected_mirror)
-        self.mirror_cb = ctk.CTkComboBox(r1, variable=self.mirror_var, values=list(PYPI_MIRRORS.keys()), width=80, command=self.on_mirror_change)
+        self.mirror_cb = ctk.CTkComboBox(r1, variable=self.mirror_var, values=list(PYPI_MIRRORS.keys()), width=80, command=self.on_mirror_change, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.mirror_cb.pack(side='left', padx=2)
         # 点击下拉触发测速
         self.mirror_cb.bind("<Button-1>", self._on_mirror_dropdown_click)
         self.python_env_var = ctk.StringVar(value=self.python_exe_path)
-        self.python_env_cb = ctk.CTkComboBox(r1, variable=self.python_env_var, values=self.python_paths, width=180, command=self.on_python_env_change)
+        self.python_env_cb = ctk.CTkComboBox(r1, variable=self.python_env_var, values=self.python_paths, width=180, command=self.on_python_env_change, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.python_env_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(r1, text="添加", width=50, command=self.select_python_environment).pack(side='left', padx=2)
-        ctk.CTkButton(r1, text="删除", width=50, command=self.delete_python_environment).pack(side='left', padx=2)
+        ctk.CTkButton(r1, text="添加", width=50, command=self.select_python_environment, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(r1, text="删除", width=50, command=self.delete_python_environment, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
 
         # 2 插件环境维护
         sec2 = self._section(self.left, "插件维护")
         s2r1 = ctk.CTkFrame(sec2); s2r1.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s2r1, text="CustomNodes目录:").pack(side='left')
+        ctk.CTkLabel(s2r1, text="CustomNodes目录:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.custom_nodes_var = ctk.StringVar()
         # 改为下拉列表，来源于历史记录；选择变化时保存并可触发扫描
-        self.custom_nodes_cb = ctk.CTkComboBox(s2r1, variable=self.custom_nodes_var, values=self.custom_nodes_history, width=120, command=self.on_custom_nodes_change)
+        self.custom_nodes_cb = ctk.CTkComboBox(s2r1, variable=self.custom_nodes_var, values=self.custom_nodes_history, width=120, command=self.on_custom_nodes_change, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.custom_nodes_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(s2r1, text="浏览", width=50, command=self.add_customnodes_dir).pack(side='left', padx=2)
-        ctk.CTkButton(s2r1, text="删除", width=50, command=self.delete_customnodes_dir).pack(side='left', padx=2)
+        ctk.CTkButton(s2r1, text="浏览", width=50, command=self.add_customnodes_dir, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s2r1, text="删除", width=50, command=self.delete_customnodes_dir, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
 
         s2r2 = ctk.CTkFrame(sec2); s2r2.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s2r2, text="依赖列表:").pack(side='left')
+        ctk.CTkLabel(s2r2, text="依赖列表:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.deps_list_var = ctk.StringVar()
-        self.deps_list_cb = ctk.CTkComboBox(s2r2, variable=self.deps_list_var, values=[], width=50, command=self.on_deps_file_selected)
+        self.deps_list_cb = ctk.CTkComboBox(s2r2, variable=self.deps_list_var, values=[], width=50, command=self.on_deps_file_selected, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.deps_list_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(s2r2, text="检测依赖", width=50, command=self.detect_dependencies).pack(side='left', padx=2)
-        ctk.CTkButton(s2r2, text="手动添加", width=50, command=self.manual_add_requirements).pack(side='left', padx=2)
+        ctk.CTkButton(s2r2, text="检测依赖", width=50, command=self.detect_dependencies, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s2r2, text="手动添加", width=50, command=self.manual_add_requirements, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
 
         # Git 克隆插件行
         s2r3 = ctk.CTkFrame(sec2); s2r3.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s2r3, text="插件地址:").pack(side='left')
+        ctk.CTkLabel(s2r3, text="插件地址:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.git_url_var = ctk.StringVar()
         # 改用下拉列表，来源于历史记录，可在克隆后自动加入
-        self.git_url_cb = ctk.CTkComboBox(s2r3, variable=self.git_url_var, values=self.plugin_history, width=200)
+        self.git_url_cb = ctk.CTkComboBox(s2r3, variable=self.git_url_var, values=self.plugin_history, width=200, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.git_url_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(s2r3, text="安装插件", width=40, command=self.clone_plugin_into_customnodes).pack(side='left', padx=2)
-        ctk.CTkButton(s2r3, text="检测更新", width=40, command=self.check_plugin_updates).pack(side='left', padx=2)
-        ctk.CTkButton(s2r3, text="更新插件", width=40, command=self.update_selected_plugin).pack(side='left', padx=2)      
+        ctk.CTkButton(s2r3, text="安装插件", width=40, command=self.clone_plugin_into_customnodes, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s2r3, text="检测更新", width=40, command=self.check_plugin_updates, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s2r3, text="更新插件", width=40, command=self.update_selected_plugin, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)      
 
         # 3 Comfy环境操作
         sec3 = self._section(self.left, "ComfyUI环境操作")
         s3r1 = ctk.CTkFrame(sec3); s3r1.pack(fill='x', padx=2, pady=2)
         self.skip_check_var = ctk.BooleanVar(value=True)
-        ctk.CTkCheckBox(s3r1, text="跳过已安装检测", variable=self.skip_check_var).pack(side='left')
+        ctk.CTkCheckBox(s3r1, text="跳过已安装检测", variable=self.skip_check_var, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         
         s3grid = ctk.CTkFrame(sec3); s3grid.pack(fill='x', padx=2, pady=2)
         buttons = [
@@ -222,7 +222,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         for idx, (text, fn) in enumerate(buttons):
             r = idx // 5
             c = idx % 5
-            btn = ctk.CTkButton(s3grid, text=text, command=fn, width=90)
+            btn = ctk.CTkButton(s3grid, text=text, command=fn, width=90, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             btn.grid(row=r, column=c, padx=6, pady=6, sticky="n")
             if fn == self.backup_environment_files:
                 self.backup_button = btn
@@ -232,48 +232,48 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         # 4 第三方库管理
         sec4 = self._section(self.left, "第三方库管理")
         s4r1 = ctk.CTkFrame(sec4); s4r1.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s4r1, text="环境库名:").pack(side='left')
+        ctk.CTkLabel(s4r1, text="环境库名:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.lib_name_var = ctk.StringVar()
         # 使用下拉列表框替代文本输入框，支持历史记录
-        self.lib_name_cb = ctk.CTkComboBox(s4r1, variable=self.lib_name_var, values=self.lib_history, width=200)
+        self.lib_name_cb = ctk.CTkComboBox(s4r1, variable=self.lib_name_var, values=self.lib_history, width=200, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.lib_name_cb.pack(side='left', fill='x', expand=True, padx=6)
         # 绑定回车键事件，方便快速执行
         self.lib_name_cb.bind('<Return>', lambda e: self.search_library_exact())
-        ctk.CTkLabel(s4r1, text="版本号:").pack(side='left', padx=6)
+        ctk.CTkLabel(s4r1, text="版本号:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=6)
         self.version_var = ctk.StringVar()
-        self.version_cb = ctk.CTkComboBox(s4r1, variable=self.version_var, values=[], width=100)
+        self.version_cb = ctk.CTkComboBox(s4r1, variable=self.version_var, values=[], width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.version_cb.pack(side='left')
         s4r2 = ctk.CTkFrame(sec4); s4r2.pack(fill='x', padx=2, pady=2)
         # 按钮并排一行，更紧凑
         for text, fn in [("精准查找", self.search_library_exact), ("模糊查找", self.search_library_local), ("安装库", self.install_library), ("删除库", self.uninstall_library), ("轮子安装", self.install_whl_file), ("编译安装", self.install_source_code), ("含库名插件", self.find_plugins_with_library), ("清空信息", self.clear_results)]:
-            ctk.CTkButton(s4r2, text=text, width=55, command=fn).pack(side='left', padx=2, pady=2)
+            ctk.CTkButton(s4r2, text=text, width=55, command=fn, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2, pady=2)
 
         # 5 Python手动执行集合和CMD其他命令
         sec5 = self._section(self.left, "Python手动执行命令和CMD其他命令")
         s5r1 = ctk.CTkFrame(sec5); s5r1.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s5r1, text="CMD:").pack(side='left')
+        ctk.CTkLabel(s5r1, text="CMD:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.cmd_var = ctk.StringVar()
         # 使用下拉列表框替代文本输入框，支持历史记录
-        self.cmd_cb = ctk.CTkComboBox(s5r1, variable=self.cmd_var, values=self.cmd_history, width=300)
+        self.cmd_cb = ctk.CTkComboBox(s5r1, variable=self.cmd_var, values=self.cmd_history, width=300, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.cmd_cb.pack(side='left', fill='x', expand=True, padx=2)
         # 绑定回车键事件，方便快速执行
         self.cmd_cb.bind('<Return>', lambda e: self.execute_command())
-        ctk.CTkButton(s5r1, text="命令执行", width=50, command=self.execute_command).pack(side='left', padx=2)
-        ctk.CTkButton(s5r1, text="参数说明", width=50, command=self.show_pip_params).pack(side='left')
+        ctk.CTkButton(s5r1, text="命令执行", width=50, command=self.execute_command, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s5r1, text="参数说明", width=50, command=self.show_pip_params, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
 
         # 6 Comfy版本维护
         sec6 = self._section(self.left, "ComfyUI便捷版_版本维护")
         s6r1 = ctk.CTkFrame(sec6); s6r1.pack(fill='x', padx=2, pady=2)
-        ctk.CTkLabel(s6r1, text="选择目录:").pack(side='left')
+        ctk.CTkLabel(s6r1, text="选择目录:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         self.comfy_dir_var = ctk.StringVar()
         try:
             initial_paths = list(self.comfy_paths_history) if isinstance(self.comfy_paths_history, list) else []
         except Exception:
             initial_paths = []
-        self.comfy_dir_cb = ctk.CTkComboBox(s6r1, variable=self.comfy_dir_var, values=initial_paths, width=380)
+        self.comfy_dir_cb = ctk.CTkComboBox(s6r1, variable=self.comfy_dir_var, values=initial_paths, width=380, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         self.comfy_dir_cb.pack(side='left', fill='x', expand=True, padx=2)
-        ctk.CTkButton(s6r1, text="浏览", width=50, command=lambda: self._browse_dir(self.comfy_dir_var, self._get_python_parent_dir())).pack(side='left', padx=2)
-        ctk.CTkButton(s6r1, text="管理", width=50, command=self._stub_version_manage).pack(side='left', padx=2)
+        ctk.CTkButton(s6r1, text="浏览", width=50, command=lambda: self._browse_dir(self.comfy_dir_var, self._get_python_parent_dir()), font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
+        ctk.CTkButton(s6r1, text="管理", width=50, command=self._stub_version_manage, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=2)
 
     def _build_right_panel(self):
         ctk.CTkLabel(self.right, text="执行结果", font=("Microsoft YaHei", 14, 'bold')).pack(fill='x', pady=(6, 4))
@@ -517,8 +517,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         top_frame.pack(fill='x', padx=10, pady=(10, 5))
         
         # 驱动器选择下拉框
-        ctk.CTkLabel(top_frame, text="驱动器:").pack(side='left', padx=(0, 5))
-        drive_combo = ctk.CTkComboBox(top_frame, values=available_drives, variable=current_drive, width=200, height=30)
+        ctk.CTkLabel(top_frame, text="驱动器:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 5))
+        drive_combo = ctk.CTkComboBox(top_frame, values=available_drives, variable=current_drive, width=200, height=30, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         drive_combo.pack(side='left', padx=(0, 10))
         
         def on_drive_change(choice):
@@ -534,8 +534,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         drive_combo.configure(command=on_drive_change)
         
         # 路径栏
-        ctk.CTkLabel(top_frame, text="路径:").pack(side='left', padx=(0, 5))
-        path_entry = ctk.CTkEntry(top_frame, textvariable=current_path, height=30)
+        ctk.CTkLabel(top_frame, text="路径:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 5))
+        path_entry = ctk.CTkEntry(top_frame, textvariable=current_path, height=30, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         path_entry.pack(side='left', fill='x', expand=True, padx=(0, 5))
         
         def navigate_to_path():
@@ -550,7 +550,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             except Exception as e:
                 self._show_dark_warning("路径错误", f"无法访问路径: {e}")
         
-        ctk.CTkButton(top_frame, text="跳转", width=60, command=navigate_to_path).pack(side='left')
+        ctk.CTkButton(top_frame, text="跳转", width=60, command=navigate_to_path, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         
         # 快捷按钮栏（紧凑布局）
         quick_frame = ctk.CTkFrame(dialog)
@@ -586,7 +586,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             ctk.CTkLabel(main_frame, text="请输入新目录名称:", font=ctk.CTkFont(family="Microsoft YaHei", size=12, weight="bold")).pack(pady=5)
             
             dir_name_var = ctk.StringVar()
-            name_entry = ctk.CTkEntry(main_frame, textvariable=dir_name_var, width=250)
+            name_entry = ctk.CTkEntry(main_frame, textvariable=dir_name_var, width=250, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             name_entry.pack(pady=5)
             name_entry.focus()
             
@@ -624,8 +624,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             button_frame = ctk.CTkFrame(main_frame)
             button_frame.pack(pady=10)
             
-            ctk.CTkButton(button_frame, text="创建", command=create_directory, width=80, fg_color="green", hover_color="dark green").pack(side='left', padx=5)
-            ctk.CTkButton(button_frame, text="取消", command=cancel_creation, width=80).pack(side='left', padx=5)
+            ctk.CTkButton(button_frame, text="创建", command=create_directory, width=80, fg_color="green", hover_color="dark green", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
+            ctk.CTkButton(button_frame, text="取消", command=cancel_creation, width=80, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
             
             # 绑定回车键
             name_entry.bind('<Return>', lambda e: create_directory())
@@ -650,16 +650,16 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 update_selection_label()
         
         # 使用更紧凑的按钮
-        ctk.CTkButton(quick_frame, text="📁 新建目录", width=60, command=create_new_directory).pack(side='left', padx=(0, 3))
-        ctk.CTkButton(quick_frame, text="🖥️ 桌面", width=60, command=go_desktop).pack(side='left', padx=(0, 3))
-        ctk.CTkButton(quick_frame, text="⬆️ 上级", width=60, command=go_up).pack(side='left')
+        ctk.CTkButton(quick_frame, text="📁 新建目录", width=60, command=create_new_directory, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 3))
+        ctk.CTkButton(quick_frame, text="🖥️ 桌面", width=60, command=go_desktop, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 3))
+        ctk.CTkButton(quick_frame, text="⬆️ 上级", width=60, command=go_up, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         
         # 文件列表框架
         list_frame = ctk.CTkFrame(dialog)
         list_frame.pack(fill='both', expand=True, padx=10, pady=5)
         
         # 文件列表（使用文本框模拟列表框）
-        file_text = ctk.CTkTextbox(list_frame, width=680, height=300)
+        file_text = ctk.CTkTextbox(list_frame, width=680, height=300, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         file_text.pack(fill='both', expand=True, padx=5, pady=5)
         try:
             file_text.tag_configure("selected_line", background="#1f4f99")
@@ -669,7 +669,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         sel_frame = ctk.CTkFrame(dialog)
         sel_frame.pack(fill='x', padx=10, pady=(0, 8))
         sel_label_var = ctk.StringVar(value="")
-        sel_label = ctk.CTkLabel(sel_frame, textvariable=sel_label_var)
+        sel_label = ctk.CTkLabel(sel_frame, textvariable=sel_label_var, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         sel_label.pack(side='left')
 
         def update_selection_label():
@@ -781,8 +781,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         if dialog_type == "save":
             filename_frame = ctk.CTkFrame(dialog)
             filename_frame.pack(fill='x', padx=10, pady=5)
-            ctk.CTkLabel(filename_frame, text="文件名:").pack(side='left', padx=(0, 5))
-            filename_entry = ctk.CTkEntry(filename_frame, height=30)
+            ctk.CTkLabel(filename_frame, text="文件名:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 5))
+            filename_entry = ctk.CTkEntry(filename_frame, height=30, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             filename_entry.pack(side='left', fill='x', expand=True)
             if initialfile:
                 filename_entry.insert(0, initialfile)
@@ -816,8 +816,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.result = None
             dialog.destroy()
         
-        ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100).pack(side='right', padx=(5, 0))
-        ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100).pack(side='right')
+        ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='right', padx=(5, 0))
+        ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='right')
         
         # 初始化文件列表
         refresh_file_list()
@@ -1881,9 +1881,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             button_frame = ctk.CTkFrame(frame)
             button_frame.pack(pady=(15, 5))
             
-            ctk.CTkButton(button_frame, text="精确查找", command=on_exact_mode, width=100).pack(side='left', padx=5)
-            ctk.CTkButton(button_frame, text="模糊查找", command=on_fuzzy_mode, width=100).pack(side='left', padx=5)
-            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=80).pack(side='left', padx=5)
+            ctk.CTkButton(button_frame, text="精确查找", command=on_exact_mode, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
+            ctk.CTkButton(button_frame, text="模糊查找", command=on_fuzzy_mode, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
+            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=80, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
             
             # 等待对话框关闭
             dialog.wait_window(dialog)
@@ -2256,12 +2256,12 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         # 错误图标和标题
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
-        ctk.CTkLabel(icon_frame, text="❌", font=ctk.CTkFont(size=24)).pack(side='left', padx=(0, 10))
-        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
+        ctk.CTkLabel(icon_frame, text="❌", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
+        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(side='left')
         
         # 消息文本
         ctk.CTkLabel(main_frame, text=message, text_color="#ff6b6b", justify="left", 
-                    font=ctk.CTkFont(size=12)).pack(pady=8, padx=10, anchor='w')
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10, anchor='w')
         
         # 详细信息（如果有）
         if details:
@@ -2269,7 +2269,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             details_frame.pack(fill='both', expand=True, padx=10, pady=10)
             
             # 创建可滚动的文本框
-            text_box = ctk.CTkTextbox(details_frame, height=80, font=ctk.CTkFont(size=10))
+            text_box = ctk.CTkTextbox(details_frame, height=80, font=ctk.CTkFont(family="Microsoft YaHei", size=10))
             text_box.pack(fill='both', expand=True, padx=10, pady=10)
             text_box.insert('1.0', details)
             text_box.configure(state='disabled')
@@ -2282,7 +2282,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.destroy()
         
         ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100, 
-                     font=ctk.CTkFont(size=12)).pack()
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack()
         
         # 等待对话框关闭
         self.wait_window(dialog)
@@ -2313,7 +2313,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         icon_frame = ctk.CTkFrame(main_frame)
         icon_frame.pack(fill='x', pady=(0, 15))
         ctk.CTkLabel(icon_frame, text="❓", font=ctk.CTkFont(family="Microsoft YaHei", size=24)).pack(side='left', padx=(0, 10))
-        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(size=16, weight="bold")).pack(side='left')
+        ctk.CTkLabel(icon_frame, text=title, font=ctk.CTkFont(family="Microsoft YaHei", size=16, weight="bold")).pack(side='left')
         msg_box = ctk.CTkTextbox(main_frame, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         msg_box.pack(fill='both', expand=True, padx=10, pady=10)
         msg_box.insert('1.0', message)
@@ -2334,9 +2334,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.destroy()
         
         ctk.CTkButton(button_frame, text="是", command=on_yes, width=80, 
-                     font=ctk.CTkFont(size=12)).pack(side='left', padx=(0, 10))
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 10))
         ctk.CTkButton(button_frame, text="否", command=on_no, width=80, 
-                     font=ctk.CTkFont(size=12)).pack(side='left')
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left')
         
         # 等待对话框关闭
         self.wait_window(dialog)
@@ -2376,7 +2376,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         
         # 消息文本
         ctk.CTkLabel(main_frame, text=message, text_color="white", justify="left", 
-                    font=ctk.CTkFont(size=12)).pack(pady=8, padx=10, anchor='w')
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10, anchor='w')
         
         # 详细信息（如果有）
         if details:
@@ -2384,7 +2384,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             details_frame.pack(fill='both', expand=True, padx=10, pady=10)
             
             # 创建可滚动的文本框（加大高度）
-            text_box = ctk.CTkTextbox(details_frame, height=220, font=ctk.CTkFont(size=11))
+            text_box = ctk.CTkTextbox(details_frame, height=220, font=ctk.CTkFont(family="Microsoft YaHei", size=11))
             text_box.pack(fill='both', expand=True, padx=10, pady=10)
             text_box.insert('1.0', details)
             text_box.configure(state='disabled')
@@ -2397,7 +2397,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.destroy()
         
         ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100, 
-                     font=ctk.CTkFont(size=12)).pack()
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack()
         
         # 等待对话框关闭
         self.wait_window(dialog)
@@ -2428,11 +2428,11 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         
         # 提示文本
         ctk.CTkLabel(main_frame, text=prompt, text_color="white", justify="left", 
-                    font=ctk.CTkFont(size=12)).pack(pady=8, padx=10)
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10)
         
         # 输入框
         input_var = ctk.StringVar()
-        input_entry = ctk.CTkEntry(main_frame, textvariable=input_var, width=300)
+        input_entry = ctk.CTkEntry(main_frame, textvariable=input_var, width=300, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
         input_entry.pack(pady=8)
         
         # 按钮区域
@@ -2451,9 +2451,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             dialog.destroy()
         
         ctk.CTkButton(button_frame, text="确定", command=on_ok, width=100, 
-                     font=ctk.CTkFont(size=12)).pack(side='left', padx=5)
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
         ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, 
-                     font=ctk.CTkFont(size=12)).pack(side='left', padx=5)
+                     font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
         
         # 绑定回车键
         input_entry.bind('<Return>', lambda e: on_ok())
@@ -3612,7 +3612,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             info_frame.pack(fill='x', pady=15)
             info_text = "环境目录迁移需要至少2个Python环境。\n\n您当前只有1个环境，可以：\n• 先添加另一个Python环境再使用目录迁移\n• 或者直接使用环境文件迁移（推荐）"
             ctk.CTkLabel(info_frame, text=info_text, text_color="white", justify="left", 
-                        font=ctk.CTkFont(size=12)).pack(pady=8, padx=10)
+                        font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10)
             
             # 按钮区域
             button_frame = ctk.CTkFrame(main_frame)
@@ -3634,11 +3634,11 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 self._enqueue_progress_hide()
             
             ctk.CTkButton(button_frame, text="添加环境", command=add_environment, width=100, 
-                         font=ctk.CTkFont(size=12)).pack(side='left', padx=5)
+                         font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
             ctk.CTkButton(button_frame, text="使用文件迁移", command=use_snapshot, width=100, 
-                         font=ctk.CTkFont(size=12), fg_color="green").pack(side='left', padx=5)
+                         font=ctk.CTkFont(family="Microsoft YaHei", size=12), fg_color="green").pack(side='left', padx=5)
             ctk.CTkButton(button_frame, text="取消", command=cancel_all, width=80, 
-                         font=ctk.CTkFont(size=12)).pack(side='left', padx=5)
+                         font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=5)
             
             # 等待对话框关闭
             self.wait_window(dialog)
@@ -3688,20 +3688,20 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             if has_multiple_envs:
                 env_frame = ctk.CTkFrame(options_frame)
                 env_frame.pack(fill='x', pady=8, padx=10)
-                ctk.CTkRadioButton(env_frame, text="环境目录迁移", variable=migration_mode, value="env_to_env", font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
-                ctk.CTkLabel(env_frame, text="读取环境目录，在两个Python环境之间迁移包", text_color="gray", font=ctk.CTkFont(size=11)).pack(side='left', padx=10)
+                ctk.CTkRadioButton(env_frame, text="环境目录迁移", variable=migration_mode, value="env_to_env", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
+                ctk.CTkLabel(env_frame, text="读取环境目录，在两个Python环境之间迁移包", text_color="gray", font=ctk.CTkFont(family="Microsoft YaHei", size=11)).pack(side='left', padx=10)
             
             # 环境快照迁移选项
             snapshot_frame = ctk.CTkFrame(options_frame)
             snapshot_frame.pack(fill='x', pady=8, padx=10)
-            ctk.CTkRadioButton(snapshot_frame, text="环境文件迁移", variable=migration_mode, value="snapshot", font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
-            ctk.CTkLabel(snapshot_frame, text="读取环境文件，使用保存的环境快照进行迁移", text_color="gray", font=ctk.CTkFont(size=11)).pack(side='left', padx=10)
+            ctk.CTkRadioButton(snapshot_frame, text="环境文件迁移", variable=migration_mode, value="snapshot", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
+            ctk.CTkLabel(snapshot_frame, text="读取环境文件，使用保存的环境快照进行迁移", text_color="gray", font=ctk.CTkFont(family="Microsoft YaHei", size=11)).pack(side='left', padx=10)
             
             # 说明文本
             info_frame = ctk.CTkFrame(dialog)
             info_frame.pack(fill='x', padx=30, pady=10)
             info_text = "💡 环境目录迁移：选择两个Python环境，自动对比并迁移缺失的包\n💡 环境文件迁移：选择之前保存的环境快照文件，应用到当前环境"
-            ctk.CTkLabel(info_frame, text=info_text, text_color="white", justify="left", font=ctk.CTkFont(size=12)).pack(pady=8, padx=10)
+            ctk.CTkLabel(info_frame, text=info_text, text_color="white", justify="left", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10)
             
             # 按钮区域
             button_frame = ctk.CTkFrame(dialog)
@@ -3724,8 +3724,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 # 延迟处理取消操作
                 self.after(100, lambda: self._handle_migration_cancel())
             
-            ctk.CTkButton(button_frame, text="确定", command=on_confirm, width=100, font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
-            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
+            ctk.CTkButton(button_frame, text="确定", command=on_confirm, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
+            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
             
             # 等待对话框关闭
             self.wait_window(dialog)
@@ -3784,9 +3784,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             # 源环境选择
             source_frame = ctk.CTkFrame(main_frame)
             source_frame.pack(fill='x', pady=8)
-            ctk.CTkLabel(source_frame, text="源环境（要迁移的环境）:", font=ctk.CTkFont(size=12)).pack(side='left', padx=(0, 10))
+            ctk.CTkLabel(source_frame, text="源环境（要迁移的环境）:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 10))
             source_var = ctk.StringVar()
-            source_combo = ctk.CTkComboBox(source_frame, variable=source_var, values=self.python_paths, width=350)
+            source_combo = ctk.CTkComboBox(source_frame, variable=source_var, values=self.python_paths, width=350, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             source_combo.pack(side='left', fill='x', expand=True)
             if self.python_paths:
                 source_combo.set(self.python_paths[0])
@@ -3794,9 +3794,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             # 目标环境选择
             target_frame = ctk.CTkFrame(main_frame)
             target_frame.pack(fill='x', pady=8)
-            ctk.CTkLabel(target_frame, text="目标环境（要迁移到的环境）:", font=ctk.CTkFont(size=12)).pack(side='left', padx=(0, 10))
+            ctk.CTkLabel(target_frame, text="目标环境（要迁移到的环境）:", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=(0, 10))
             target_var = ctk.StringVar()
-            target_combo = ctk.CTkComboBox(target_frame, variable=target_var, values=self.python_paths, width=350)
+            target_combo = ctk.CTkComboBox(target_frame, variable=target_var, values=self.python_paths, width=350, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             target_combo.pack(side='left', fill='x', expand=True)
             if len(self.python_paths) > 1:
                 target_combo.set(self.python_paths[1])
@@ -3805,7 +3805,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             info_frame = ctk.CTkFrame(main_frame)
             info_frame.pack(fill='x', pady=15)
             info_text = "💡 此操作将把源环境中存在但目标环境中不存在的包安装到目标环境"
-            ctk.CTkLabel(info_frame, text=info_text, text_color="white", justify="left", font=ctk.CTkFont(size=12)).pack(pady=8, padx=10)
+            ctk.CTkLabel(info_frame, text=info_text, text_color="white", justify="left", font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=8, padx=10)
             
             # 按钮区域
             button_frame = ctk.CTkFrame(main_frame)
@@ -3834,8 +3834,8 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 dialog_result["cancelled"] = True
                 dialog.destroy()
             
-            ctk.CTkButton(button_frame, text="确定", command=on_confirm, width=100, font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
-            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, font=ctk.CTkFont(size=12)).pack(side='left', padx=10)
+            ctk.CTkButton(button_frame, text="确定", command=on_confirm, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
+            ctk.CTkButton(button_frame, text="取消", command=on_cancel, width=100, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='left', padx=10)
             
             # 等待对话框关闭
             self.wait_window(dialog)
@@ -5132,9 +5132,9 @@ class ComfyUIEnvironmentManager(ctk.CTk):
             count_entry.pack(side='left', padx=2)
             
             # 刷新和关闭按钮
-            refresh_btn = ctk.CTkButton(btns, text="🔄 刷新", width=80, command=refresh_version_list)
+            refresh_btn = ctk.CTkButton(btns, text="🔄 刷新", width=80, command=refresh_version_list, font=ctk.CTkFont(family="Microsoft YaHei", size=12))
             refresh_btn.pack(side='right', padx=4)
-            ctk.CTkButton(btns, text="关闭", width=90, command=dialog.destroy).pack(side='right', padx=6)
+            ctk.CTkButton(btns, text="关闭", width=90, command=dialog.destroy, font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(side='right', padx=6)
             
             # 延迟自动刷新，确保对话框完全显示
             dialog.after(1000, lambda: refresh_version_list() if dialog.winfo_exists() else None)
@@ -5247,19 +5247,19 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         
         # 版本信息 - 居中显示
         ctk.CTkLabel(main_frame, text=f"版本: {APP_VERSION}", text_color="white", justify="center", 
-                    font=ctk.CTkFont(size=12)).pack(pady=5)
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=5)
         
         # 作者信息 - 居中显示
         ctk.CTkLabel(main_frame, text="作者: 练老师", text_color="white", justify="center", 
-                    font=ctk.CTkFont(size=12)).pack(pady=5)
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=5)
         
         # QQ群信息 - 居中显示
         ctk.CTkLabel(main_frame, text="QQ群: 723799422", text_color="white", justify="center", 
-                    font=ctk.CTkFont(size=12)).pack(pady=5)
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=5)
         
         # GitHub URL - 居中显示
         ctk.CTkLabel(main_frame, text="GitHub地址:", text_color="white", justify="center", 
-                    font=ctk.CTkFont(size=12)).pack(pady=5)
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=12)).pack(pady=5)
         
         # 可点击的GitHub链接 - 居中显示
         def open_github():
@@ -5268,7 +5268,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         github_label = ctk.CTkLabel(main_frame, 
                                    text="https://github.com/dxhklck/comfyui_envtools", 
                                    text_color="#0080ff", 
-                                   font=ctk.CTkFont(size=12, underline=True), 
+                                   font=ctk.CTkFont(family="Microsoft YaHei", size=12, underline=True), 
                                    cursor="hand2")
         github_label.pack(pady=2, padx=30)
         github_label.bind("<Button-1>", lambda e: open_github())
