@@ -972,7 +972,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                             proc.terminate()
                         except Exception:
                             try:
-                                subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                                subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)], capture_output=True, creationflags=CREATE_NO_WINDOW)
                             except Exception:
                                 pass
             except Exception:
@@ -2035,8 +2035,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         try:
             self._text_enqueue(f"[更新] 开始更新插件: {repo_name}")
             
-            # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
-            CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            # 使用全局定义的CREATE_NO_WINDOW标志
             
             # 执行git pull更新插件
             cmd = ["git", "pull"]
@@ -2090,8 +2089,7 @@ class ComfyUIEnvironmentManager(ctk.CTk):
                 
                 # 尝试获取远程仓库URL
                 try:
-                    # 定义平台特定的subprocess创建标志，避免弹出控制台窗口
-                    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    # 使用全局定义的CREATE_NO_WINDOW标志
                     result = subprocess.run(
                         ['git', 'remote', 'get-url', 'origin'],
                         cwd=item_path,
