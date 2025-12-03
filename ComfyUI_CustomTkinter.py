@@ -5277,27 +5277,167 @@ class ComfyUIEnvironmentManager(ctk.CTk):
         self.wait_window(dialog)
 
     def show_help_document(self):
-        """显示帮助文档，直接使用浏览器打开HTML文件"""
+        """显示帮助文档，使用纯文本格式"""
         
-        # 获取help_document.html文件路径，兼容开发环境和打包环境
-        import sys
-        # 检查是否为打包环境
-        if getattr(sys, 'frozen', False):
-            # 打包环境：使用exe所在目录
-            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-            help_file_path = os.path.join(exe_dir, "help_document.html")
-        else:
-            # 开发环境：使用脚本所在目录
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            help_file_path = os.path.join(script_dir, "help_document.html")
+        # 创建弹出窗口
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("帮助文档")
+        dialog.geometry("800x600")
+        dialog.minsize(600, 400)
+        dialog.transient(self)
+        dialog.grab_set()
         
-        # 检查文件是否存在
-        if not os.path.exists(help_file_path):
-            self._show_dark_warning("文件不存在", f"帮助文档文件未找到: {help_file_path}")
-            return
+        # 设置暗色标题栏
+        self._set_dark_titlebar(dialog)
         
-        # 直接使用默认浏览器打开HTML文件
-        webbrowser.open(help_file_path)
+        # 居中显示
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # 创建主容器
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # 创建多行文本框，用于显示帮助文档内容
+        text_box = ctk.CTkTextbox(main_frame, wrap='word', font=ctk.CTkFont(size=12))
+        text_box.pack(fill='both', expand=True, padx=5, pady=5)
+        
+        # 帮助文档内容 - 纯文本格式，不使用Markdown语法
+        help_content = """📋 ComfyUI 环境维护小工具 使用教程
+
+==========================================
+一、首次使用流程
+==========================================
+
+1. 启动程序
+   - 直接运行程序，主界面包含6大功能区域
+   - 顶部有帮助和关于按钮，底部有进度条
+
+2. 配置Python环境
+   1. 在国内源和Python环境区域，选择合适的镜像源（推荐阿里云）
+   2. 点击"添加"按钮，选择ComfyUI使用的Python解释器路径
+   3. 选择添加的Python环境，系统会自动加载相关配置
+
+3. 配置插件目录
+   1. 在插件维护区域，点击"浏览"按钮
+   2. 选择ComfyUI的custom_nodes目录
+   3. 系统会自动检测该目录下的插件情况
+
+==========================================
+二、核心功能使用教程
+==========================================
+
+1. 环境检测与修复
+   1. 在ComfyUI环境操作区域，点击"依赖情况"按钮
+   2. 系统会自动检测当前环境的依赖状态
+   3. 查看右侧结果面板，了解缺失的依赖项
+   4. 根据检测结果，点击"实际安装"按钮安装缺失依赖
+
+2. 安装第三方库
+   1. 在第三方库管理区域，输入要安装的库名称（如：numpy）
+   2. 可选：在"版本号"输入框中指定版本（如：1.26.0）
+   3. 点击"安装库"按钮，等待安装完成
+   4. 右侧结果面板会显示安装过程和结果
+
+3. 安装ComfyUI插件
+   1. 在插件维护区域，找到"插件地址"输入框
+   2. 输入GitHub插件仓库地址（如：https://github.com/username/plugin-name）
+   3. 点击"安装插件"按钮，等待安装完成
+   4. 安装成功后，插件会自动添加到custom_nodes目录
+
+4. 执行Python命令
+   1. 在Python手动执行命令和CMD其他命令区域，输入要执行的命令
+   2. 例如：pip list（查看已安装库）或python -c "print('Hello')"
+   3. 点击"命令执行"按钮，查看执行结果
+   4. 支持历史命令记录，可通过下拉列表快速选择
+
+5. 环境备份与迁移
+   1. 在ComfyUI环境操作区域，点击"环境备份"按钮
+   2. 选择备份路径，系统会备份当前环境配置
+   3. 如需迁移环境，在目标机器上点击"环境迁移"按钮
+   4. 选择备份文件，系统会自动恢复环境配置
+
+==========================================
+三、常用功能组合
+==========================================
+
+场景1：解决插件依赖问题
+   1. 安装插件后，点击"依赖情况"检测缺失依赖
+   2. 点击"实际安装"安装所有缺失依赖
+   3. 安装完成后，点击"模拟安装"验证安装效果
+
+场景2：管理多个Python环境
+   1. 点击"添加"按钮，添加多个Python解释器
+   2. 通过下拉列表切换不同的Python环境
+   3. 在不同环境下执行命令或安装库
+
+场景3：更新已安装插件
+   1. 在插件维护区域，点击"检测更新"按钮
+   2. 查看右侧结果面板，了解可更新的插件
+   3. 选择要更新的插件，点击"更新插件"按钮
+
+==========================================
+四、实用技巧
+==========================================
+
+1. 快捷键
+   - Enter：在命令行输入框中快速执行命令
+   - 下拉列表：支持历史记录快速选择，提高操作效率
+
+2. 结果查看
+   - 右侧结果面板实时显示操作日志
+   - 可滚动查看完整的执行过程
+   - 遇到错误时，详细查看日志信息以定位问题
+
+3. 镜像源优化
+   - 若安装库速度较慢，尝试切换其他镜像源
+   - 推荐优先级：阿里云 → 腾讯云 → 华为云 → 豆瓣 → 官方源
+
+==========================================
+五、常见问题解决
+==========================================
+
+问题1：Python环境添加失败
+   - 检查Python路径是否正确
+   - 确认Python版本与ComfyUI兼容
+   - 尝试使用管理员权限运行程序
+
+问题2：插件安装失败
+   - 检查GitHub仓库地址是否正确
+   - 确认网络连接正常
+   - 查看右侧结果面板的错误信息
+   - 尝试手动克隆插件到custom_nodes目录
+
+问题3：库安装冲突
+   - 点击"查找冲突"按钮，检测冲突库
+   - 根据提示卸载或更新冲突的库
+   - 尝试使用"模拟安装"功能预览安装效果
+
+==========================================
+六、联系支持
+==========================================
+
+- 作者：练老师
+- QQ群：723799422
+- GitHub：https://github.com/dxhklck/comfyui_envtools
+- 如有问题或建议，请在QQ群中反馈
+
+使用提示：
+- 定期备份环境配置，避免意外情况
+- 在执行重要操作前，先使用"模拟安装"功能预览
+- 遇到问题时，详细查看右侧结果面板的日志信息
+"""
+        
+        # 插入帮助文档内容
+        text_box.insert('1.0', help_content)
+        
+        # 禁用编辑功能，只允许查看
+        text_box.configure(state='disabled')
+        
+        # 等待对话框关闭
+        self.wait_window(dialog)
 
 if __name__ == '__main__':
     app = ComfyUIEnvironmentManager()
