@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import sys
@@ -24,8 +25,84 @@ import shutil
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-# 设置默认字体为yahei - 使用CTkFont类的默认配置
-# 注意：customtkinter会自动应用到所有组件
+
+# ==================== 中文字体处理 ====================
+# 解决打包exe后中文乱码问题
+class FontManager:
+    """管理系统字体，确保中文正确显示"""
+    
+    # 优先级字体列表（从高到低）
+    PREFERRED_FONTS = [
+        "Microsoft YaHei",      # 微软雅黑
+        "SimHei",               # 黑体
+        "KaiTi",                # 楷体
+        "FangSong",             # 仿宋
+        "SimSun",               # 宋体
+        "SimLi",                # 隶书
+        "YouYuan",              # 幼圆
+        "LiSu",                 # 隶书
+        "FZShuTi",              # 方正舒体
+        "FZKaiTi",              # 方正楷体
+    ]
+    
+    _cached_font = None
+    _cached_font_name = None
+    
+    @classmethod
+    def get_system_font(cls):
+        """获取系统可用的中文字体，返回第一个可用字体名"""
+        if cls._cached_font_name:
+            return cls._cached_font_name
+        
+        try:
+            import tkinter.font as tkFont
+            available_fonts = set(tkFont.families())
+            
+            # 遍历优先级列表，找到第一个可用字体
+            for font_name in cls.PREFERRED_FONTS:
+                if font_name in available_fonts:
+                    cls._cached_font_name = font_name
+                    return font_name
+            
+            # 如果都没有，尝试通过大小写变体
+            available_fonts_lower = {f.lower() for f in available_fonts}
+            for font_name in cls.PREFERRED_FONTS:
+                if font_name.lower() in available_fonts_lower:
+                    for f in available_fonts:
+                        if f.lower() == font_name.lower():
+                            cls._cached_font_name = f
+                            return f
+            
+            # 如果还是没有，返回系统默认字体（通常是宋体）
+            # 注意：不要返回空字符串，这会导致使用系统默认的西文字体
+            default_font = list(available_fonts)[0] if available_fonts else "SimSun"
+            cls._cached_font_name = default_font
+            return default_font
+            
+        except Exception as e:
+            # 出错时使用固定的备用字体名称
+            cls._cached_font_name = "SimSun"
+            return "SimSun"
+    
+    @classmethod
+    def create_font(cls, family=None, size=12, weight="normal", **kwargs):
+        """创建保证中文显示正确的字体对象"""
+        if family is None:
+            family = cls.get_system_font()
+        
+        # 如果指定的字体是英文通用名称，尝试获取系统可用的对应中文字体
+        if family in ["Microsoft YaHei", "Arial", "Helvetica"]:
+            system_font = cls.get_system_font()
+            family = system_font
+        
+        return ctk.CTkFont(family=family, size=size, weight=weight, **kwargs)
+
+# 程序启动时初始化字体（确保字体缓存被填充）
+FontManager.get_system_font()
+
+def create_font(family="Microsoft YaHei", size=12, weight="normal"):
+    """便捷函数：创建中文友好的字体"""
+    return FontManager.create_font(family, size, weight)
 
 class ComfyUIEnvironmentManager(ctk.CTk):
     def __init__(self):

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import time
@@ -309,7 +310,7 @@ class ComfyVenvTools:
             cmd = [py, '-m', 'pip', 'list', '--format=freeze']
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=30, creationflags=CREATE_NO_WINDOW)
             out = proc.stdout or proc.stderr or ''
-            return out[:3000]
+            return out  # 移除3000字符限制，完整显示所有包
         except subprocess.TimeoutExpired:
             return "查看当前环境超时"
         except Exception as e:
